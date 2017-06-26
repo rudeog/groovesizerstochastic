@@ -127,6 +127,9 @@ void scheduleNextStepSlave() // as MIDI clock slave
     incomingSwingDur = map(swing, 0, 255, clockDivSlave[clockDivSlaveSelect], ((2*clockDivSlave[clockDivSlaveSelect])/3)*2);
   }
   seqTrueStep = (seqTrueStep + 1) % 32;
+  /* This will determine which pulse we should play the next step on. 
+   *  
+   */
   nextStepIncomingPulse = nextStepIncomingPulse + incomingSwingDur; 
 }
 

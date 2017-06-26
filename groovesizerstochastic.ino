@@ -10,7 +10,8 @@
  ***   http://groovesizer.com
  *   
  *   
- *   AS - taking this as a starting point to make the stochastic sequencer
+ *   AS - taking this as a starting point to make the stochastic sequencer 
+ *   when I started, global vars took up 1559
  *   
  ************************************************************************
  * Copyright (C) 2013 MoShang (Jean Marais) moshang@groovesizer.com
@@ -42,26 +43,37 @@ EEPROM256_512 mem_1;            // define the eeprom chip
 byte rwBuffer[64];              // our EEPROM read/write buffer
 
 /* U I
- *  Normal mode:
- *  buttons turn on and off notes
- *  R-shift enters cell edit mode (r shift again exits it)
- *  hit button lets you make that the current button for editing (flashes)
- *  During editing, pot 1 adjusts velocity, pot 2 adjusts probability and amounts are shown as a scale on line 1-2 and 3-4 respectively (current cell still flashes)
- *  During editing F1-F6 will mute unmute tracks
- *  R-shift again exits edit mode
- *  F1-F6 sets current track
- *  L-Shift enters pattern mode
- *  in this mode F1-F4 select current pattern which will switch after current bar
- *  pot 1 sets number of times to play pattern (row 1-2 indicates as a scale the number between 1-16)
- *  Pot 2-5 set probability of next pattern and is shown as a scale on rows 1-4
- *  L-shift and R-shift enter global mode
- *  In this mode pot 1 selects midi channel
- *  pot 2 selects tempo
- *  pot 3 selects swing
- *  F1 plus another cell will save to that location
- *  F2 plus another cell will load from that location
+ *  __Normal mode:
+ *  -Neither L-shift nor R-shift are lit
+ *  -buttons turn on and off notes
+ *  -F-buttons switch between the 6 tracks
  *  
- *  pot 6 is play/pause/stop
+ *  __Edit mode:
+ *  -R-shift enters cell edit mode (r shift again exits it and returns to normal mode)
+ *  -R-shift is lit
+ *  -hitting a button lets you make that the current step for editing (flashes)
+ *  -Pot 1 adjusts velocity of current step
+ *  -Pot 2 adjusts probability of current step
+ *  -F1-F6 will mute unmute tracks as shown with leds
+ *  
+ *  __Pattern mode:
+ *  -L-Shift enters pattern mode (and again exits it)
+ *  -F1-F4 select current pattern which will switch right away or after current pattern is done depending on setting (if playing)
+ *  -Pot 5 sets number of times to play pattern
+ *  -Pot 1-4 set probability of next pattern and is shown as a scale on rows 1-4
+ *  -F6 set whether to switch patterns immediately or after current pattern end (lit means delayed switch)
+ *  
+ *  __Global mode:
+ *  -L-shift and R-shift enter global mode
+ *  -Both L and R shift are lit
+ *  -Pot 1 - midi channel
+ *  -Pot 2 - tempo
+ *  -Pot 3 - swing
+ *  -F1 plus another cell will save to that location
+ *  -F2 plus another cell will load from that location
+ *  
+ *  __All modes:
+ *  pot 6 is play/pause/stop - left is stop, right is play, middle is pause
  */
 
 /* S T O R A G E
@@ -81,6 +93,7 @@ byte rwBuffer[64];              // our EEPROM read/write buffer
  *   probability (1 to 16) 4bits
  *   
  *   */
+ 
 #define NUM_STEPS     32
 #define NUM_TRACKS    6
 #define NUM_PATTERNS  4
@@ -88,30 +101,31 @@ byte rwBuffer[64];              // our EEPROM read/write buffer
 uint8_t gMidiChannel; // which midi channel we are sending on
 uint8_t gTempo;       // 0=slave (respond to start/stop hopefully as well?)
 int8_t gSwing;        // tbd
+int8_t gDelayPatternSwitch; // whether to delay switching patterns till end of pattern
 
-typedef struct _step {
+typedef struct _seqStep {
   uint8_t velocity : 4; // 0=off 15=highest ( if<>0, add 1, multiply by 8 and subtract 1)
   uint8_t probability : 4;   // 0-15 where 15 is always
-} Step;
+} SeqStep;
 
-typedef struct _track {
+typedef struct _seqTrack {
   uint8_t numSteps :5; // length of track 1-32 (add 1)
   uint8_t clockDivider : 2; //speed 2x 1x 1/2x 1/4x
   uint8_t muted : 1;        // muted or not
   uint8_t midiNote; // which midi note it sends
-  Step steps[NUM_STEPS]; 
-} Track;
+  SeqStep steps[NUM_STEPS]; 
+} SeqTrack;
 
-typedef struct _pattern {
+typedef struct _seqPattern {
   uint8_t numCycles : 4; // add 1 for 16 - number of times to play
   uint8_t nextPatternProb[NUM_PATTERNS/2]; // 4 bits for probability of which pattern plays next
-  Track tracks[NUM_TRACKS];
-} Pattern;
+  SeqTrack tracks[NUM_TRACKS];
+} SeqPattern;
 
-Pattern gPatterns[NUM_PATTERNS]; // about 828 bytes
+SeqPattern gPatterns[NUM_PATTERNS]; // about 828 bytes
 // we have 32k of eeprom so we can store a number of sets
 
-/* S T A T E
+/* S E Q U E N C E R   S T A T E
  * Current state
  *  */
 
@@ -119,6 +133,8 @@ Pattern gPatterns[NUM_PATTERNS]; // about 828 bytes
 unsigned long gCurrentStepPosition;
 // which pattern we are on (could use 2 bits)
 uint8_t gCurrentPattern;
+// which pattern needs to be switched to at end of bar? overrides programmed switch
+uint8_t gNextPattern;
 // nth cycle of current pattern - to determine when to switch (could use 4 bits)
 uint8_t gCurrentPatternCycle;
 // step position on each track (could reduce to 3 bytes)
@@ -126,8 +142,11 @@ uint8_t gCurrentTrackStepPosition[NUM_TRACKS];
 // state (playing, stopped)
 uint8_t gCurrentState;
 
+/* U I   S T A T E
+ * Keep track of what's going on 
+ */
 
-//int versionNumber = 27;
+int versionNumber = 27;
 
 // sequencer variables
 byte seqTrueStep; // we need to keep track of the true sequence position (independent of sequence length)
@@ -329,6 +348,8 @@ byte incomingSwingDur = 0;
 byte clockDivSlaveSelect = 1; // default is 16th
 byte clockDivSlave[3] = {3, 6, 12};
 // unsigned long barTarget = 0; // needed to make sure we keep sync over div changes (pattern changes) when on internal clock  
+
+// create instance of midi:MidiInterface<HardwareSerial) giving it the name midiA on port 'Serial'
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial, midiA);
 
 //***** INTERNAL CLOCK *****

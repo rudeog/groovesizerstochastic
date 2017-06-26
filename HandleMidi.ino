@@ -42,7 +42,10 @@ void HandleNoteOff(byte channel, byte pitch, byte velocity)
 {
 } 
 
-void HandleClock(void) // what to do for 24ppq clock pulses
+/* Called 24 times per QN when we are receiving midi clock
+ *  
+ */
+void HandleClock(void)
 {
   lastClock = millis();
   
@@ -68,12 +71,18 @@ void HandleClock(void) // what to do for 24ppq clock pulses
   }
 }
 
+/* Called when we receive a MIDI start
+ *  
+ */
 void HandleStart (void)
 {
     syncStarted = true;
     seqReset();
 }
 
+/* Called when we receive a midi stop
+ *  
+ */
 void HandleStop (void)
 {
   syncStarted = false;

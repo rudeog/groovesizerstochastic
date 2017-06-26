@@ -666,6 +666,11 @@ void checkThru()
     midiA.turnThruOn(midi::DifferentChannel);
 }
 
+/* @AS the idea here is to be able to determine when a pot has changed
+ *  so we can react to it. we lock all the pots to begin with whenever mode changes (and whenever one changes we lock the others)
+ *  and then when pot value changes, it differs from it's locked value so we know it's changed
+ *  and we can react to that.
+ */
 void lockPot(byte Pot) // values of 0 - 5 for each pot and 6 for all
 {
   if (Pot == 6)

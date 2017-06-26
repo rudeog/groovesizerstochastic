@@ -4,6 +4,8 @@
 
 void setup() {
   // setup for the sequencer timer 
+  // initialize: specify value in microseconds for timer interval
+  // attachInterrupt: specify function to call for each tick
   Timer1.initialize(5208); // default 120bpm @ 96ppq (1 quarter = 500ms, so 500000/96) 
   Timer1.attachInterrupt(internalClock);
 

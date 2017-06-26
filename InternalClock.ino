@@ -1,5 +1,10 @@
+/* This gets called when timer1 ticks. This corresponds to BPM so it
+ *  will get called 96 times per quarter note (our resolution)
+ */
 void internalClock()
 {
+  /* Midi clock is sent 24 times per quarter note, so divide 
+   */
   if (clockCounter % 4 == 0)
   {
     if (midiSyncOut && !midiClock)            
@@ -17,7 +22,7 @@ void internalClock()
   {
     if (clockCounter >= nextStepPulse)
     {
-      playStep();
+      playStep(); // in Sequencer
       scheduleNextStep();
     }
 

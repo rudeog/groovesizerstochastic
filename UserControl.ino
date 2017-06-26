@@ -472,12 +472,12 @@ void userControl()
               clearMem = true;
               confirm = i;
               shiftL = true;
-              clearJust;
+              clearJust();
             }
             else
             {
               shiftL = true;
-              clearJust;
+              clearJust();
               confirm = 255;
             }  
           }
@@ -490,7 +490,7 @@ void userControl()
                 clearMem = false;
                 tocClear(confirm);
                 confirm = 255; // turns confirm off - we chose 255 because it's a value that can't be arrived at with a buttonpress
-                clearJust;
+                clearJust();
                 longPress = 0; 
               }
               else
@@ -498,7 +498,7 @@ void userControl()
                 save = true; // we're go to save a preset
                 pageNum = confirm*4; // the number of the EEPROM page we want to write to is the number of the button times 4 - one memory location is 4 pages long
                 tocWrite(confirm); // write a new toc that adds the current save location
-                clearJust;
+                clearJust();
                 confirm = 255; // turns confirm off                     
               }
             }
