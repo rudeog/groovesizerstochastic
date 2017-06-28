@@ -8,7 +8,6 @@ void loop()
   // force inclusion
   //gPatterns[0].tracks[0].steps[0].velocity=10;
   
-  // Call midiA.read the fastest you can for real-time performance.
   // This will invoke callbacks - see HandleMidi   
   midiA.read();
   
@@ -36,14 +35,15 @@ void loop()
   }
 
   // we check buttons at the top of the loop, the "just" flags get reset here every time
-  // it's best to reset the "just" flags manually whenever we check for "just" and find it true - use "clearJust()"
+  // it's best to reset the "just" flags manually whenever we check for "just" and find it true - use "BUTTON_CLEAR_JUST_INDICATORS()"
   // it prevents another just function from being true further down in the same loop
-  check_switches(); //defined in ButtonCheck in the tab above
+  buttonsUpdate(); //defined in ButtonCheck in the tab above
 
   // get the pot values
-  getPots(); // defined in HelperFunctions
+  potsUpdate(); // defined in HelperFunctions
 
-    // see if it's time to lock the pots
+  // see if it's time to lock the pots
+  // if a second has elapsed since the pots moved, lock all them
   if (lockTimer != 0 && millis() - lockTimer > 1000)
   {
     lockPot(6); // value of 6 locks all pots

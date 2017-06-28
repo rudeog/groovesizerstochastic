@@ -1,10 +1,12 @@
+
+
 void LEDs()
 {
- // blink the led for each step in the sequence
-static byte stepLEDrow[4];
-// controlLEDrow is defined as global variable above so we can set it from helper functions
-static unsigned long ledBlink; // for blinking an LED
-static unsigned long ledBlink2; // for blinking another LED 
+  // blink the led for each step in the sequence
+  static byte stepLEDrow[4];
+  // controlLEDrow is defined as global variable above so we can set it from helper functions
+  static unsigned long ledBlink; // for blinking an LED
+  static unsigned long ledBlink2; // for blinking another LED 
   // ******************************************
   //     LED setup: work out what is lit
   //     end of button check if/else structure
@@ -150,11 +152,164 @@ static unsigned long ledBlink2; // for blinking another LED
   updateLeds();
 }
 
+/**********************************************************************************************
+ ***
+ *** ShiftOut to address 42 LEDs via 4 74HC595s serial to parallel shifting registers 
+ *** Based on http://arduino.cc/en/Tutorial/ShiftOut
+ ***
+ ***********************************************************************************************/
+void shiftOut(int myLEDdataPin, int myLEDclockPin, byte myDataOut) {
+  // This shifts 8 bits out MSB first, 
+  // on the rising edge of the clock,
+  // clock idles low
+
+  //internal function setup
+  int i=0;
+  int pinState;
+  pinMode(myLEDclockPin, OUTPUT);
+  pinMode(myLEDdataPin, OUTPUT);
+
+  //clear everything out just in case to
+  //prepare shift register for bit shifting
+  digitalWrite(myLEDdataPin, 0);
+  digitalWrite(myLEDclockPin, 0);
+
+  //for each bit in the byte myDataOut
+  //NOTICE THAT WE ARE COUNTING DOWN in our for loop
+  //This means that %00000001 or "1" will go through such
+  //that it will be pin Q0 that lights. 
+  for (i=7; i>=0; i--)  {
+    digitalWrite(myLEDclockPin, 0);
+
+    //if the value passed to myDataOut and a bitmask result 
+    // true then... so if we are at i=6 and our value is
+    // %11010100 it would the code compares it to %01000000 
+    // and proceeds to set pinState to 1.
+    if ( myDataOut & (1<<i) ) {
+      pinState= 1;
+    }
+    else {  
+      pinState= 0;
+    }
+
+    //Sets the pin to HIGH or LOW depending on pinState
+    digitalWrite(myLEDdataPin, pinState);
+    //register shifts bits on upstroke of clock pin  
+    digitalWrite(myLEDclockPin, 1);
+    //zero the data pin after shift to prevent bleed through
+    digitalWrite(myLEDdataPin, 0);
+  }
+
+  //stop shifting
+  digitalWrite(myLEDclockPin, 0);
+}
+
+void showNumber()
+{
+  static byte nums[25] = 
+  {
+    B01110010,
+    B01010010,
+    B01010010,
+    B01010010,
+    B01110010,
+
+    B01110111,
+    B00010001,
+    B01110111,
+    B01000001,
+    B01110111,
+
+    B01010111,
+    B01010100,
+    B01110111,
+    B00010001,
+    B00010111,
+
+    B01000111,
+    B01000001,
+    B01110001,
+    B01010001,
+    B01110001,
+
+    B01110111,
+    B01010101,
+    B01110111,
+    B01010001,
+    B01110001    
+  };
+
+  byte offset = 0; // horizontal offset for even numbers 
+  byte row = 0; // vertical offset for the start of the digit
+
+  ledsOff();
+
+  if (number > 199) // add two dots for numbers 200 and over
+  {
+    LEDrow[3] = B00000001;
+    LEDrow[4] = B00000001;
+  }
+
+  else if (number > 99) // add a dot for numbers 100 and over
+    LEDrow[4] = B00000001;
+
+  //digits under 10
+  if ((number % 10) % 2 == 0) // even numbers
+    offset = 4;
+  else
+    offset = 0;
+  row = ((number % 10)/2)*5;      
+
+  for (byte j = 0; j < 5; j++)
+  {
+    for (byte i = 0; i < 3; i++) // 3 pixels across
+    {      
+      if (bitRead(nums[row + j], offset + i)) // ie. if it returns 1  
+        LEDrow[j] = bitSet(LEDrow[j], 7 - i);
+    }
+  }
+
+  // digits over 10
+  if (((number / 10) % 10) % 2 == 0) // even numbers
+    offset = 4;
+  else
+    offset = 0;
+  row = (((number / 10) % 10)/2)*5;      
+
+  for (byte j = 0; j < 5; j++)
+  {
+    for (byte i = 0; i < 3; i++) // 3 pixels across
+    {      
+      if (bitRead(nums[row + j], offset + i)) // ie. if it returns 1  
+        LEDrow[j] = bitSet(LEDrow[j], 3 - i);
+    }
+  }
+}
+
+void ledsOff()
+{
+  for (byte i = 0; i < 5; i++)
+    LEDrow[i] =  B00000000;
+}
+void checkThru()
+{
+  if(thruOn == 0)
+    midiA.turnThruOff();
+  else if (thruOn == 1)
+    midiA.turnThruOn(midi::Full);
+  else if (thruOn == 2)
+    midiA.turnThruOn(midi::DifferentChannel);
+}
+
+// @AS this makes no sense to me... 
 // this function shifts out the the 4 bytes corresponding to the led rows
 void updateLeds(void)
 {
-  static boolean lastSentTop = false; // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge case where 4 rows of LEDs lit at the same time sourcing too much current
-  //ground LEDlatchPin and hold low for as long as you are transmitting
+  static boolean lastSentTop = false; 
+  // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge 
+  // case where 4 rows of LEDs lit at the same time sourcing too much current
+  
+  // ground LEDlatchPin and hold low for as long as you are transmitting
   digitalWrite(LEDlatchPin, 0);
   if (!lastSentTop) // send the top to rows
   {

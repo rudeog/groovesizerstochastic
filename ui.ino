@@ -75,19 +75,19 @@ void userControl()
     // BUTTONS
     //change mode
 
-    if (justpressed[32])
+    if (BUTTON_JUST_PRESSED(32))
     {
       mode = 1;
-      clearJust();  
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
-    if (justpressed[39])
+    if (BUTTON_JUST_PRESSED(39))
     {
       mode = 2;
-      clearJust();  
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
     for (byte i = 0; i < 6; i++)
     {
-      if (justpressed[33 + i])
+      if (BUTTON_JUST_PRESSED(33 + i))
       {
         if ((currentTrack < 6 && currentTrack == i) || (currentTrack > 5 && currentTrack == i + 6)) // the track is already selected
         {
@@ -99,7 +99,7 @@ void userControl()
         {
           currentTrack = (currentTrack < 6) ? i : i + 6;
         }
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
     buttonCheckSelected(); // defined in HelperFunctions
@@ -109,7 +109,7 @@ void userControl()
     // ***** MODE 1 - ACCENTS ******
     // *****************************
   case 1:
-    if (justreleased[32])
+    if (BUTTON_JUST_RELEASED(32))
     {
       if (shiftL)
       { 
@@ -122,7 +122,7 @@ void userControl()
         shiftMode(); // lock pots, clear just array, shift L & R = false
       }  
     }
-    if (pressed[32]) // shift L is held
+    if (BUTTON_IS_PRESSED(32)) // shift L is held
     {
       // pots
       if (unlockedPot(3)) // flamdelay according to tempo
@@ -138,17 +138,17 @@ void userControl()
       }
 
       // buttons
-      if (justreleased[33]) // clear array currently being edited
+      if (BUTTON_JUST_RELEASED(33)) // clear array currently being edited
       {
         clearEdit();
         shiftL = true;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
-      else if (justreleased[39]) // clear everything
+      else if (BUTTON_JUST_RELEASED(39)) // clear everything
       {
         clearAll(0);
         shiftL = true;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
 
@@ -159,13 +159,13 @@ void userControl()
     // ****** MODE 2 - FLAMS *******
     // *****************************
   case 2:
-    if (justreleased[39])
+    if (BUTTON_JUST_RELEASED(39))
     {
       if (!shiftR)
       {
         currentTrack = (currentTrack < 6) ? currentTrack + 6 : currentTrack - 6;
         mode = 0; 
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
       else
       {
@@ -251,7 +251,7 @@ void userControl()
 
     if (unlockedPot(5)) // adjust bpm && clockDivider
     {
-      if (pressed[32])
+      if (BUTTON_IS_PRESSED(32))
       {
         int tmp = map(pot[5], 0, 1023, 0, 2);
         if (!syncStarted)
@@ -297,34 +297,34 @@ void userControl()
     }
 
     // buttons
-    if (pressed[32])
+    if (BUTTON_IS_PRESSED(32))
     {
-      if (justpressed[33])
+      if (BUTTON_JUST_PRESSED(33))
       {       
         clearEdit();
         shiftL = true;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
 
-      if (justpressed[39])
+      if (BUTTON_JUST_PRESSED(39))
       {       
         clearAll(0);
         shiftL = true;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
 
-    if (pressed[39])
+    if (BUTTON_IS_PRESSED(39))
     {
-      if (justreleased[32])
+      if (BUTTON_JUST_RELEASED(32))
       {
         mode = 5; // change to references mode
         lockPot(6);
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
 
-    if (justreleased[32])
+    if (BUTTON_JUST_RELEASED(32))
     {
       if (shiftL) // don't change mode
       { 
@@ -338,7 +338,7 @@ void userControl()
       }  
     }
 
-    if (justpressed[33]) // stop/start the sequencer
+    if (BUTTON_JUST_PRESSED(33)) // stop/start the sequencer
     {
       if (!midiClock)
       {
@@ -369,30 +369,30 @@ void userControl()
           //restartPlaySync = true;
         }
       } 
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justpressed[34])
+    if (BUTTON_JUST_PRESSED(34))
     {
       tapTempo();
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justpressed[35]) // switch to mute page
+    if (BUTTON_JUST_PRESSED(35)) // switch to mute page
     {
       mutePage = true;
       skipPage = false;
-      clearJust();  
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justpressed[36]) // switch to skip page
+    if (BUTTON_JUST_PRESSED(36)) // switch to skip page
     {
       mutePage = false;
       skipPage = true;
-      clearJust();  
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justpressed[37]) // nudge tempo slower
+    if (BUTTON_JUST_PRESSED(37)) // nudge tempo slower
     {
       if (!clockStarted)
       {
@@ -406,10 +406,10 @@ void userControl()
         if (clockCounterSlave > 0)
           clockCounterSlave--;
       }
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justpressed[38]) // nudge tempo faster
+    if (BUTTON_JUST_PRESSED(38)) // nudge tempo faster
     {
       if (!clockStarted)
       {
@@ -421,10 +421,10 @@ void userControl()
       else
         if (clockCounterSlave < nextStepIncomingPulse) 
           clockCounterSlave++;
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (justreleased[39]) // set trueStep - useful to flip the swing "polarity"
+    if (BUTTON_JUST_RELEASED(39)) // set trueStep - useful to flip the swing "polarity"
     {
       if (shiftR)
       {
@@ -433,7 +433,7 @@ void userControl()
       else
       {
         seqCurrentStep = seqTrueStep;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
 
@@ -445,7 +445,7 @@ void userControl()
     // *** MODE 4 - TRIGGER MODE ***
     // *****************************
   case 4:
-    if (justreleased[32])
+    if (BUTTON_JUST_RELEASED(32))
     {
       if (shiftL) // don't change mode
       { 
@@ -460,24 +460,24 @@ void userControl()
 
     for (byte i = 0; i < 32; i++)
     {
-      if (justpressed[i])
+      if (BUTTON_JUST_PRESSED(i))
       {
         i += (trigPage * 32); // there are 32 locations to a page
         if (i < 112) // there are only 112 save locations
         {
-          if (pressed[32])
+          if (BUTTON_IS_PRESSED(32))
           {
             if (i != nowPlaying && checkToc(i))
             {       
               clearMem = true;
               confirm = i;
               shiftL = true;
-              clearJust();
+              BUTTON_CLEAR_JUST_INDICATORS();
             }
             else
             {
               shiftL = true;
-              clearJust();
+              BUTTON_CLEAR_JUST_INDICATORS();
               confirm = 255;
             }  
           }
@@ -490,7 +490,7 @@ void userControl()
                 clearMem = false;
                 tocClear(confirm);
                 confirm = 255; // turns confirm off - we chose 255 because it's a value that can't be arrived at with a buttonpress
-                clearJust();
+                BUTTON_CLEAR_JUST_INDICATORS();
                 longPress = 0; 
               }
               else
@@ -498,7 +498,7 @@ void userControl()
                 save = true; // we're go to save a preset
                 pageNum = confirm*4; // the number of the EEPROM page we want to write to is the number of the button times 4 - one memory location is 4 pages long
                 tocWrite(confirm); // write a new toc that adds the current save location
-                clearJust();
+                BUTTON_CLEAR_JUST_INDICATORS();
                 confirm = 255; // turns confirm off                     
               }
             }
@@ -507,7 +507,7 @@ void userControl()
               longPress = millis();
               save = false;
               recall = false;
-              clearJust();
+              BUTTON_CLEAR_JUST_INDICATORS();
             }
             else
             {
@@ -515,14 +515,14 @@ void userControl()
               save = false;
               recall = false;
               cancelSave = true;
-              clearJust();
+              BUTTON_CLEAR_JUST_INDICATORS();
             }
           }
         }
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
 
-      else if (pressed[i])
+      else if (BUTTON_IS_PRESSED(i))
       {
         i += (trigPage * 32); // multiply the trigpage by 32
         if (i < 112) // there are only 112 save locations
@@ -544,7 +544,7 @@ void userControl()
           }
         }
       }
-      else if (justreleased[i]) // we don't have to check if save is true, since we wouldn't get here if it were
+      else if (BUTTON_JUST_RELEASED(i)) // we don't have to check if save is true, since we wouldn't get here if it were
       {
         i += (trigPage * 32); // multiply the trigpage by 32 and add to to i
         if (i < 112) // there are only 112 save locations
@@ -557,7 +557,7 @@ void userControl()
           {
             recall = true; // we're ready to recall a preset
             pageNum = i*4; // one memory location is 4 pages long
-            clearJust();
+            BUTTON_CLEAR_JUST_INDICATORS();
             if (midiTrigger)
             {
               midiA.sendNoteOn(i, 127, triggerChannel); // send a pattern trigger note on triggerChannel (default is channel 10)
@@ -569,33 +569,33 @@ void userControl()
         }
       }  
     } 
-    if (pressed[32])
+    if (BUTTON_IS_PRESSED(32))
     {
-      if (justpressed[33])
+      if (BUTTON_JUST_PRESSED(33))
       {
         trigPage = 0;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
         shiftL = true;    
       }  
-      else if (justpressed[34])
+      else if (BUTTON_JUST_PRESSED(34))
       {
         trigPage = 1;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
         shiftL = true;  
       }
-      else if (justpressed[35])
+      else if (BUTTON_JUST_PRESSED(35))
       {
         trigPage = 2;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
         shiftL = true;  
       }
-      else if (justpressed[36])
+      else if (BUTTON_JUST_PRESSED(36))
       {
         trigPage = 3;
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
         shiftL = true;
       }
-      else if (justpressed[37]) // set followAction to 2 - return to the head
+      else if (BUTTON_JUST_PRESSED(37)) // set followAction to 2 - return to the head
       {
         if (followAction != 2)
         {
@@ -609,9 +609,9 @@ void userControl()
           shiftL = true;
         }
         save = true; // save the patch with its new followAction
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
-      else if (justpressed[38]) // set followAction to 1 - play the next pattern
+      else if (BUTTON_JUST_PRESSED(38)) // set followAction to 1 - play the next pattern
       {
         if (followAction != 1)
         {
@@ -625,38 +625,38 @@ void userControl()
           shiftL = true;
         }
         save = true; // save the patch with its new followAction 
-        clearJust();
+        BUTTON_CLEAR_JUST_INDICATORS();
       }
     }
-    else if (pressed[33]) // step repeat
+    else if (BUTTON_IS_PRESSED(33)) // step repeat
     {
       seqNextStep = 0; 
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
-    else if (justreleased[33])
+    else if (BUTTON_JUST_RELEASED(33))
     {
       seqNextStep = 1;
       seqCurrentStep = seqTrueStep;
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
-    else if (pressed[34]) // momentary reverse
+    else if (BUTTON_IS_PRESSED(34)) // momentary reverse
     {
       seqNextStep = -1; 
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
-    else if (justreleased[34])
+    else if (BUTTON_JUST_RELEASED(34))
     {
       seqNextStep = 1;
       seqCurrentStep = seqTrueStep;
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    else if (justpressed[35])
+    else if (BUTTON_JUST_PRESSED(35))
     {
       fxFlamSet();
       fxFlamDelay = (clockDiv[clockDivSelect] * 4) / 3;
       fxFlamDecay = 10;
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
 
@@ -672,27 +672,27 @@ void userControl()
     showingNumbers = false;
 
     // buttons
-    if (justpressed[32])
+    if (BUTTON_JUST_PRESSED(32))
     {
       mode = 3;
       shiftL = true;
       savePrefs(); // save the preferences on exit
     }
 
-    if (justpressed[39])
+    if (BUTTON_JUST_PRESSED(39))
     {
       mode = 3;
       shiftR = true;
       savePrefs(); // save the preferences on exit
     }
 
-    if (justpressed[33])
+    if (BUTTON_JUST_PRESSED(33))
     {
       midiSyncOut = !midiSyncOut;
-      clearJust();
+      BUTTON_CLEAR_JUST_INDICATORS();
     }
 
-    if (pressed[34])
+    if (BUTTON_IS_PRESSED(34))
     {
       showingNumbers = true;
       number = thruOn;
@@ -706,7 +706,7 @@ void userControl()
       }
     }
 
-    if (pressed[35])
+    if (BUTTON_IS_PRESSED(35))
     {
       showingNumbers = true;
       number = triggerChannel;

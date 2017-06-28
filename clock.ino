@@ -41,5 +41,18 @@ void internalClock()
 
 
 
-
-
+// things that need to happen as a consequence of the bpm changing
+void setBPM(uint8_t BPM)
+{
+  gSeqState.tempo=BPM;
+  if(BPM==0) { // bpm of 0 indicates ext clock sync
+    gRunningState.tempo=DEFAULT_BPM; // until we get clock sync we can't know what the tempo is    
+    Timer1.detachInterrupt();
+    // TODO start receiving midi clock
+  } else {
+    gRunningState.tempo=BPM;
+    // use the same tick interval as midi clock to simplify matters    
+    Timer1.setPeriod(1000000/((BPM/60)*24)); // with period in microseconds (same as 1000000*60/BPM/24)
+    Timer1.attachInterrupt(internalClock);
+  }
+  

@@ -1,36 +1,14 @@
+/************************************************************************
+ *   AS - taking this groovesizer golf as a starting point to make the stochastic sequencer 
+ *   when I started, global vars took up 1559
+ *   See end of this file for some info
+ ************************************************************************/
+
 #include <MIDI.h>
 #include <midi_Defs.h>
 #include <midi_Message.h>
 #include <midi_Namespace.h>
 #include <midi_Settings.h>
-
-/************************************************************************
- ***   GROOVESIZER Golf v.021 - 12-Track, 32-Step MIDI Drum Sequencer
- ***   for the GROOVESIZER 8-Bit Musical Multiboard
- ***   http://groovesizer.com
- *   
- *   
- *   AS - taking this as a starting point to make the stochastic sequencer 
- *   when I started, global vars took up 1559
- *   
- ************************************************************************
- * Copyright (C) 2013 MoShang (Jean Marais) moshang@groovesizer.com
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see http://www.gnu.org/licenses/
- * 
- ************************************************************************/
-
 #include <stdint.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>       // included so we can use PROGMEM
@@ -42,111 +20,67 @@
 EEPROM256_512 mem_1;            // define the eeprom chip
 byte rwBuffer[64];              // our EEPROM read/write buffer
 
-/* U I
- *  __Normal mode:
- *  -Neither L-shift nor R-shift are lit
- *  -buttons turn on and off notes
- *  -F-buttons switch between the 6 tracks
- *  
- *  __Edit mode:
- *  -R-shift enters cell edit mode (r shift again exits it and returns to normal mode)
- *  -R-shift is lit
- *  -hitting a button lets you make that the current step for editing (flashes)
- *  -Pot 1 adjusts velocity of current step
- *  -Pot 2 adjusts probability of current step
- *  -F1-F6 will mute unmute tracks as shown with leds
- *  
- *  __Pattern mode:
- *  -L-Shift enters pattern mode (and again exits it)
- *  -F1-F4 select current pattern which will switch right away or after current pattern is done depending on setting (if playing)
- *  -Pot 5 sets number of times to play pattern
- *  -Pot 1-4 set probability of next pattern and is shown as a scale on rows 1-4
- *  -F6 set whether to switch patterns immediately or after current pattern end (lit means delayed switch)
- *  
- *  __Global mode:
- *  -L-shift and R-shift enter global mode
- *  -Both L and R shift are lit
- *  -Pot 1 - midi channel
- *  -Pot 2 - tempo
- *  -Pot 3 - swing
- *  -F1 plus another cell will save to that location
- *  -F2 plus another cell will load from that location
- *  
- *  __All modes:
- *  pot 6 is play/pause/stop - left is stop, right is play, middle is pause
- */
 
-/* S T O R A G E
- * We will have:
- * 1 channel selection
- * tempo selection 0=slave, 1-255=tempo
- * swing
- *4 patterns
- * number of times to play pattern (count) 4bit 1-16
- * probability of next pattern to play 1-4 (After count above), 3 bits each where 0 is never, 7 highest
- * 6 tracks (each track can play one midi note)
- *  length selection for track (1-32 notes in track) 5 bits
- *  clock divider (3 bits) speed 4x 2x 1x 1/2x 1/4x
- *  midi note selection for track
- *  32 steps:
- *   velocity level (0=off, 15=highest) 4bits
- *   probability (1 to 16) 4bits
- *   
- *   */
- 
+// Definitions 
 #define NUM_STEPS     32
 #define NUM_TRACKS    6
 #define NUM_PATTERNS  4
+#define DEFAULT_BPM   120       // until we get clock sync, we assume this bpm, also to start with it will be this
 
-uint8_t gMidiChannel; // which midi channel we are sending on
-uint8_t gTempo;       // 0=slave (respond to start/stop hopefully as well?)
-int8_t gSwing;        // tbd
-int8_t gDelayPatternSwitch; // whether to delay switching patterns till end of pattern
-
-typedef struct _seqStep {
+struct SeqStep {
   uint8_t velocity : 4; // 0=off 15=highest ( if<>0, add 1, multiply by 8 and subtract 1)
   uint8_t probability : 4;   // 0-15 where 15 is always
-} SeqStep;
+};
 
-typedef struct _seqTrack {
+struct SeqTrack {
   uint8_t numSteps :5; // length of track 1-32 (add 1)
-  uint8_t clockDivider : 2; //speed 2x 1x 1/2x 1/4x
+  uint8_t clockDivider : 3; //speed 4x 2x 1x 1/2x 1/4x 1/8x
   uint8_t muted : 1;        // muted or not
-  uint8_t midiNote; // which midi note it sends
+  uint8_t midiNote : 7; // which midi note it sends
   SeqStep steps[NUM_STEPS]; 
-} SeqTrack;
+};
 
-typedef struct _seqPattern {
+struct SeqPattern {
   uint8_t numCycles : 4; // add 1 for 16 - number of times to play
   uint8_t nextPatternProb[NUM_PATTERNS/2]; // 4 bits for probability of which pattern plays next
   SeqTrack tracks[NUM_TRACKS];
-} SeqPattern;
+};
 
-SeqPattern gPatterns[NUM_PATTERNS]; // about 828 bytes
-// we have 32k of eeprom so we can store a number of sets
+//
+// Data that can be saved/loaded (static during sequencer run operation)
+// we have 32k of eeprom so we can store a number of these
+//
+struct SequencerState {
+  SeqPattern patterns[NUM_PATTERNS]; // about 828 bytes
+  uint8_t midiChannel;        // which midi channel we are sending on
+  uint8_t tempo;              // 0=slave (respond to start/stop hopefully as well?)
+  int8_t  swing;              // move forward or backward
+  int8_t  randomRegen;        // generate a new random number every n steps (1..32)
+  int8_t  delayPatternSwitch; // whether to delay switching patterns till end of pattern
+};
 
-/* S E Q U E N C E R   S T A T E
- * Current state
- *  */
+SequencerState gSeqState;
 
-// which real step position we are on since play started (could potentially not need this wide)
-unsigned long gCurrentStepPosition;
-// which pattern we are on (could use 2 bits)
-uint8_t gCurrentPattern;
-// which pattern needs to be switched to at end of bar? overrides programmed switch
-uint8_t gNextPattern;
-// nth cycle of current pattern - to determine when to switch (could use 4 bits)
-uint8_t gCurrentPatternCycle;
-// step position on each track (could reduce to 3 bytes)
-uint8_t gCurrentTrackStepPosition[NUM_TRACKS];
-// state (playing, stopped)
-uint8_t gCurrentState;
-
-/* U I   S T A T E
- * Keep track of what's going on 
- */
-
-int versionNumber = 27;
+//
+// Data that represents current state such as where we are in the sequence
+//
+struct RunningState {
+  uint8_t tempo;      // current actual tempo (calculated or determined from seq state)
+  uint8_t stepPosition; // which position (0..31) we are on (played last)    (might not need since we are storing per track)
+  uint8_t trackPositions[NUM_TRACKS]; // which position on each track we played last (only need 5 bits per)
+  // which pattern we are playing and editing (could use 2 bits)
+  uint8_t pattern;
+  // which pattern needs to be switched to at end of bar? overrides programmed switch
+  uint8_t nextPattern;
+  // nth cycle of current pattern - to determine when to switch (could use 4 bits)
+  uint8_t patternCurrentCycle;  
+  // state (playing, stopped, paused)
+  uint8_t transportState;
+  // if true, hold the current pattern and don't increase patternCurrentCycle
+  uint8_t patternHold;
+};
+RunningState gRunningState;
+const uint8_t gVersionNumber = 1;
 
 // sequencer variables
 byte seqTrueStep; // we need to keep track of the true sequence position (independent of sequence length)
@@ -265,14 +199,26 @@ const byte LEDdataPin = 4;
 const byte BUTTONlatchPin = 7;
 const byte BUTTONclockPin = 8;
 const byte BUTTONdataPin = 9;
+//@AS*********************************************************************************************
+// 5 x 8 = 40 --- do the math
+#define BUTTON_BYTES 5
+uint8_t gButtonJustChanged[BUTTON_BYTES];
+uint8_t gButtonIsPressed[BUTTON_BYTES];
 
-// needed by the button debouncer
-// based on http://www.adafruit.com/blog/2009/10/20/example-code-for-multi-button-checker-with-debouncing/
-#define DEBOUNCE 5
-byte pressed[40], justpressed[40], justreleased[40], buttons[40];
+#define BUTTON_IS_PRESSED(index) \
+  ((gButtonIsPressed[(index)/8]) & (1 << ((index) % 8)))
 
-// define the byte variables that the button states are read into
-byte BUTTONvar[5];
+#define BUTTON_JUST_CHANGED(index) \
+  ((gButtonJustChanged[(index)/8]) & (1 << ((index) % 8)))
+
+#define BUTTON_JUST_PRESSED(index) \
+  (BUTTON_JUST_CHANGED(index) && BUTTON_IS_PRESSED(index))  
+  
+#define BUTTON_JUST_RELEASED(index) \
+  (BUTTON_JUST_CHANGED(index) && (!BUTTON_IS_PRESSED(index)))    
+
+#define BUTTON_CLEAR_JUST_INDICATORS() (memset(gButtonJustChanged,0,BUTTON_BYTES))  
+//@AS*********************************************************************************************
 
 // this determines what the buttons (and pots)are currently editing
 byte mode = 0;
@@ -362,16 +308,63 @@ boolean startSeq = false; // a flag to delay starting the sequencer so it aligns
 
 
 
+/* U I
+ *  We can be playing in any mode
+ *  A pattern will be considered ended when the longest track has run it's course
+ *  
+ *  __Normal mode:
+ *  -Neither L-shift nor R-shift are lit
+ *  -buttons turn on and off notes
+ *  -F-buttons switch between the 6 tracks
+ *  -Pot 1 length in steps of current track
+ *  -Pot 2 clock divider for current track
+ *  
+ *  __Edit mode:
+ *  -R-shift enters cell edit mode (r shift again exits it and returns to normal mode)
+ *  -R-shift is lit
+ *  -hitting a button lets you make that the current step for editing (flashes)
+ *  -Pot 1 adjusts velocity of current step
+ *  -Pot 2 adjusts probability of current step
+ *  -F1-F6 will mute unmute tracks as shown with leds
+ *  
+ *  __Pattern mode:
+ *  Lights F1-F4 show the current pattern
+ *  Light F5 indicates pattern hold
+ *  Light F6 if lit means delay switch till end of pattern
+ *  -L-Shift enters pattern mode (and again exits it)
+ *  -F1-F4 select current pattern which will switch right away or after current pattern is done depending on setting (if playing)
+ *  -Pot 5 sets number of times to play pattern
+ *  -Pot 1-4 set probability of next pattern and is shown as a scale on rows 1-4
+ *  -F6 set whether to switch patterns immediately or after current pattern end (lit means delayed switch)
+ *  -F5 pattern hold - holds the current pattern (toggle) so that it doesn't switch
+ *  __Global mode:
+ *  -L-shift and R-shift enter global mode
+ *  -Both L and R shift are lit
+ *  -Pot 1 - midi channel
+ *  -Pot 2 - tempo
+ *  -Pot 3 - swing
+ *  -Pot 5 - Random regen (how often to regenerate a random number -- every step, every n steps)
+ *  -F1 plus another cell will save to that location
+ *  -F2 plus another cell will load from that location
+ *  
+ *  __All modes:
+ *  pot 6 is play/pause/stop - left is stop, right is play, middle is pause
+ */
 
-
-
-
-
-
-
-
-
-
-
-
-
+/* S T O R A G E
+ * We will have:
+ * 1 channel selection
+ * tempo selection 0=slave, 1-255=tempo
+ * swing
+ *4 patterns
+ * number of times to play pattern (count) 4bit 1-16
+ * probability of next pattern to play 1-4 (After count above), 3 bits each where 0 is never, 7 highest
+ * 6 tracks (each track can play one midi note)
+ *  length selection for track (1-32 notes in track) 5 bits
+ *  clock divider (3 bits) speed 4x 2x 1x 1/2x 1/4x
+ *  midi note selection for track
+ *  32 steps:
+ *   velocity level (0=off, 15=highest) 4bits
+ *   probability (1 to 16) 4bits
+ *   
+ *   */
