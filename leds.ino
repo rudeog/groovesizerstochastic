@@ -1,7 +1,38 @@
+// for the rows of LEDs
+// the byte that will be shifted out 
 
+// time in ms to display temporary values (like if a pot is twiddled)
+#define LED_TEMP_DISPLAY_TIME 1000
 
-void LEDs()
+#define LED_BYTES 5
+byte LEDrow[LED_BYTES];
+
+// will be set to true if we are currently showing a temporary value on the display
+uint8_t LEDShowingTemporary;
+uint16_t LEDTimer; // timer for temporary value
+
+// setup code for controlling the LEDs via 74HC595 serial to parallel shift registers
+// based on ShiftOut http://arduino.cc/en/Tutorial/ShiftOut
+const byte LEDlatchPin = 2;
+const byte LEDclockPin = 6;
+const byte LEDdataPin = 4;
+
+void 
+ledsSetup(void)
 {
+  //define pin modes 
+  pinMode(LEDlatchPin, OUTPUT);
+  pinMode(LEDclockPin, OUTPUT); 
+  pinMode(LEDdataPin, OUTPUT);
+  LEDTimer=0;
+  LEDShowingTemporary=0;
+}
+
+// this is used when we are not displaying a temporary value.
+// it does a full update based on the current state of things
+static void ledsFullUpdate()
+{
+#if 0  
   // blink the led for each step in the sequence
   static byte stepLEDrow[4];
   // controlLEDrow is defined as global variable above so we can set it from helper functions
@@ -147,9 +178,7 @@ void LEDs()
 
     LEDrow[4] = controlLEDrow; // light the LED for the mode we're in
   }
-  // this function shifts out the the 5 bytes corresponding to the led rows
-  // declared in ShiftOut (see above)
-  updateLeds();
+#endif  
 }
 
 /**********************************************************************************************
@@ -158,7 +187,7 @@ void LEDs()
  *** Based on http://arduino.cc/en/Tutorial/ShiftOut
  ***
  ***********************************************************************************************/
-void shiftOut(int myLEDdataPin, int myLEDclockPin, byte myDataOut) {
+static void shiftOut(int myLEDdataPin, int myLEDclockPin, byte myDataOut) {
   // This shifts 8 bits out MSB first, 
   // on the rising edge of the clock,
   // clock idles low
@@ -204,9 +233,52 @@ void shiftOut(int myLEDdataPin, int myLEDclockPin, byte myDataOut) {
   digitalWrite(myLEDclockPin, 0);
 }
 
-void showNumber()
+
+// turn off all leds
+static void ledsOff(void)
 {
-  static byte nums[25] = 
+  memset(LEDrow,0,LED_BYTES);
+  
+}
+
+// @AS this makes no sense to me... needs to be called twice to
+// see the screen and then the led's are on 50% duty cycle. is it really necessary? 
+// this function shifts out the the 4 bytes corresponding to the led rows
+static void ledsLightUp(void)
+{
+  static boolean lastSentTop = false; 
+  // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge 
+  // case where 4 rows of LEDs lit at the same time sourcing too much current
+  
+  // ground LEDlatchPin and hold low for as long as you are transmitting
+  digitalWrite(LEDlatchPin, 0);
+  if (!lastSentTop) // send the top to rows
+  {
+    shiftOut(LEDdataPin, LEDclockPin, B00000000);
+    shiftOut(LEDdataPin, LEDclockPin, B00000000); 
+    shiftOut(LEDdataPin, LEDclockPin, B00000000);
+    shiftOut(LEDdataPin, LEDclockPin, LEDrow[1]); 
+    shiftOut(LEDdataPin, LEDclockPin, LEDrow[0]);
+    lastSentTop = true;
+  }
+  else // ie. lastSentTop is true, then send the bottom 3 rows
+  {
+    shiftOut(LEDdataPin, LEDclockPin, LEDrow[4]);
+    shiftOut(LEDdataPin, LEDclockPin, LEDrow[3]); 
+    shiftOut(LEDdataPin, LEDclockPin, LEDrow[2]);
+    shiftOut(LEDdataPin, LEDclockPin, B00000000); 
+    shiftOut(LEDdataPin, LEDclockPin, B00000000);
+    lastSentTop = false;
+  }
+  //return the latch pin high to signal chip that it 
+  //no longer needs to listen for information
+  digitalWrite(LEDlatchPin, 1);
+}
+
+// TODO move this to progmem? performance might be slower
+void ledsShowNumber(uint8_t number)
+{
+ static byte nums[25] = 
   {
     B01110010,
     B01010010,
@@ -284,53 +356,29 @@ void showNumber()
         LEDrow[j] = bitSet(LEDrow[j], 3 - i);
     }
   }
+
+  // start the countdown for showing the number
+  LEDShowingTemporary=1;
+  LEDTimer=millis();
 }
 
-void ledsOff()
+// called from main loop
+void ledsUpdate(void)
 {
-  for (byte i = 0; i < 5; i++)
-    LEDrow[i] =  B00000000;
-}
-void checkThru()
-{
-  if(thruOn == 0)
-    midiA.turnThruOff();
-  else if (thruOn == 1)
-    midiA.turnThruOn(midi::Full);
-  else if (thruOn == 2)
-    midiA.turnThruOn(midi::DifferentChannel);
-}
+  // if we are displaying a temporary value, just let it abide
+  if(LEDShowingTemporary) {
+    // if enough time has passed...
+    if((int16_t)((uint16_t)millis()-LEDTimer) > LED_TEMP_DISPLAY_TIME) {
+      // stop showing it
+      LEDShowingTemporary=0;
+    } else
+      return;
+  }
 
-// @AS this makes no sense to me... 
-// this function shifts out the the 4 bytes corresponding to the led rows
-void updateLeds(void)
-{
-  static boolean lastSentTop = false; 
-  // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge 
-  // case where 4 rows of LEDs lit at the same time sourcing too much current
+  // full update based on current state
+  ledsFullUpdate();
   
-  // ground LEDlatchPin and hold low for as long as you are transmitting
-  digitalWrite(LEDlatchPin, 0);
-  if (!lastSentTop) // send the top to rows
-  {
-    shiftOut(LEDdataPin, LEDclockPin, B00000000);
-    shiftOut(LEDdataPin, LEDclockPin, B00000000); 
-    shiftOut(LEDdataPin, LEDclockPin, B00000000);
-    shiftOut(LEDdataPin, LEDclockPin, LEDrow[1]); 
-    shiftOut(LEDdataPin, LEDclockPin, LEDrow[0]);
-    lastSentTop = true;
-  }
-  else // ie. lastSentTop is true, then send the bottom 3 rows
-  {
-    shiftOut(LEDdataPin, LEDclockPin, LEDrow[4]);
-    shiftOut(LEDdataPin, LEDclockPin, LEDrow[3]); 
-    shiftOut(LEDdataPin, LEDclockPin, LEDrow[2]);
-    shiftOut(LEDdataPin, LEDclockPin, B00000000); 
-    shiftOut(LEDdataPin, LEDclockPin, B00000000);
-    lastSentTop = false;
-  }
-  //return the latch pin high to signal chip that it 
-  //no longer needs to listen for information
-  digitalWrite(LEDlatchPin, 1);
+  // light the actual lights
+  ledsLightUp();
 }
 

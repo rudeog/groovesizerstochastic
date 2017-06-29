@@ -7,6 +7,21 @@
  ***********************************************************************************************/
 // min milliseconds that must elapse between button checks
 #define DEBOUNCE_TIME 5
+#define BUTTON_CLEAR_JUST_INDICATORS() (memset(gButtonJustChanged,0,BUTTON_BYTES))  
+
+// setup code for reading the buttons via CD4021B parallel to serial shift registers
+// based on ShiftIn http://www.arduino.cc/en/Tutorial/ShiftIn
+const byte BUTTONlatchPin = 7;
+const byte BUTTONclockPin = 8;
+const byte BUTTONdataPin = 9;
+
+void
+buttonSetup()
+{
+  pinMode(BUTTONlatchPin, OUTPUT);
+  pinMode(BUTTONclockPin, OUTPUT); 
+  pinMode(BUTTONdataPin, INPUT);
+}
 
 //***SHIFTIN***********************************************************************************
 // definition of the shiftIn function
@@ -88,39 +103,6 @@ void buttonsUpdate()
       previousBtnState[btnByte] &= (~mask); // turn bit off
       previousBtnState[btnByte] |= currentState; // set bit to match current state
     }
-  }
-}
-
-
-
-void buttonFunction()
-{
-  switch (mode)
-  {
-  case 0: // stepOn for tracks 0 - 11
-    for (byte i = 0; i < 4; i++)
-      edit[i] = &track[currentTrack].stepOn[i];
-    break;
-  case 1: // accents for tracks 0 - 11
-    for (byte i = 0; i < 4; i++)
-      edit[i] = &track[currentTrack].stepAccent[i];
-    break;
-  case 2: // flams for tracks 0 - 11
-    for (byte i = 0; i < 4; i++)
-      edit[i] = &track[currentTrack].stepFlam[i];
-    break;
-  case 3: //
-    if (mutePage)
-    {
-      for (byte i = 0; i < 4; i++)
-        edit[i] = &seqStepMute[i]; 
-    }
-    else if (skipPage)
-    {
-      for (byte i = 0; i < 4; i++)
-        edit[i] = &seqStepSkip[i]; 
-    }    
-    break;
   }
 }
 

@@ -1,3 +1,97 @@
+// set initial sequencer and running state
+void seqSetup(void)
+{
+  SeqStep *step;
+  SeqTrack *track;
+  // initial 0 state should be fine for most things
+  gSeqState.randomRegen = 1;
+  gSeqState.tempo=DEFAULT_BPM;
+
+  for(uint8_t i=0;i<NUM_PATTERNS;i++) {
+    for(uint8_t j=0;j<NUM_TRACKS;j++) {
+      track=&gSeqState.patterns[i].tracks[j];
+      track->numSteps=NUM_STEPS-1; // 0 based
+      track->midiNote=DEFAULT_MIDI_NOTE;
+    }    
+  }
+}
+
+void scheduleNext(void)
+{
+  // swing is only applied when clock div <= 1
+  for(uint8_t i=0;i<NUM_TRACKS;i++) {  
+    SeqTrack *track=&gSeqState.patterns[gRunningState.currentPattern].tracks[i];  
+    TrackRunningState *trState=&gRunningState.trackPositions[i];
+
+  gSeqState.swing;
+    gSeqState.tempo; // if clock div, use to calculate position in time
+  gRunningState.lastStepTime; // when we received the last step start tick
+  track->clockDivider; //0=default (1x) sets speed 0=1,1=2,2=4x or 3=1/2, 4=1/4, 5=1/8x
+  track->numSteps;
+  track->muted;
+  trState->position; // which step will be next (5 bits)
+  trState->divPosition; // may be 0-3 if divx4 or 0-1 if divx2
+  trState->isScheduled;  // whether or not we have scheduled the next note (reset to 0 when it's been played)
+  trState->nextScheduledStart;// when it's scheduled to play (need to set this)
+  
+  
+  
+  }
+  
+
+}
+
+// called from main loop to see if we need to alter sequencer state
+void seqCheckState(void)
+{
+  uint8_t maxTrackLen=0;
+  SeqPattern *curPattern=&gSeqState.patterns[gRunningState.currentPattern];  
+  
+  // determine biggest track for pattern,
+  // also determine if we've reached the end of the pattern
+  for(uint8_t i=0;i<NUM_TRACKS;i++) {
+    if(curPattern->tracks[i].numSteps > maxTrackLen)
+      maxTrackLen=curPattern->tracks[i].numSteps;
+    //if(gRunningState.trackPositions[i].position==curPattern->tracks[i].numSteps)
+  }
+  maxTrackLen++; // remember - 0 based
+
+  // check to see if we have reached the end of the pattern
+  // if so, switch or not
+
+  // check to see if any steps on any tracks need to play
+  
+  
+}
+
+void seqSetTransportState(uint8_t state)
+{
+  
+  if(gRunningState.transportState==TRANSPORT_STOPPED) {
+    // reset all track positions to 0
+    memset(gRunningState.trackPositions,0,NUM_TRACKS);
+  }
+
+  // if we are sending midi clock, send start/stop
+  if(gSeqState.midiSendClock) {
+    switch(state) {
+    case TRANSPORT_STARTED:
+      midiSendStart();
+      break;
+    case TRANSPORT_STOPPED:
+    case TRANSPORT_PAUSED:
+      midiSendStop();
+      break;        
+    }
+  }
+  
+  // finally update the state
+  gRunningState.transportState=state;
+}
+
+
+// example
+#if 0
 void playStep()
 {
   if (seqCurrentStep == 0 || seqCurrentStep == 16 || seqCurrentStep == seqFirstStep)
@@ -86,113 +180,5 @@ void playStep()
   }
   while (checkSkip(seqCurrentStep)); // do it again if the step is marked as a skip
 }
-
-void scheduleNextStep() // as internal clock master
-{
-  if (seqTrueStep%2 != 0) // it's an uneven step, ie. the 2nd shorter 16th of the swing-pair
-    swing16thDur = (2*clockDiv[clockDivSelect]) - swing16thDur;
-  else // it's an even step ie. the first longer 16th of the swing-pair
-  {
-    swing16thDur = map(swing, 0, 255, clockDiv[clockDivSelect], ((2*clockDiv[clockDivSelect])/3)*2);
-  }
-  seqTrueStep = (seqTrueStep + 1) % 32; 
-  
-  nextStepPulse = clockCounter + swing16thDur; // make sure we stay aligned with the MIDI clock pulses we send out
-  if (seqCurrentStep == 0 || seqCurrentStep == 16 || seqCurrentStep == seqFirstStep)
-  {
-    while (nextStepPulse % 4 != 0)
-      nextStepPulse--;
-  } 
-}
-
-void handleFlam(byte trNum)
-{
-  // send the flam note
-  midiA.sendNoteOff(track[trNum].midiNoteNumber, 127, track[trNum].midiChannel);
-  midiA.sendNoteOn(track[trNum].midiNoteNumber, track[trNum].nextFlamLevel, track[trNum].midiChannel);
-
-  // schedule the next flam
-  if (syncStarted)
-    scheduleFlamSlave(trNum, track[trNum].nextFlamLevel);
-  else
-    scheduleFlam(trNum, track[trNum].nextFlamLevel);
-}
-
-void scheduleNextStepSlave() // as MIDI clock slave
-{
-  if (seqTrueStep%2 != 0) // it's an uneven step, ie. the 2nd shorter 16th of the swing-pair
-    incomingSwingDur = 2 * clockDivSlave[clockDivSlaveSelect] - incomingSwingDur;
-  else // it's an even step ie. the first longer 16th of the swing-pair
-  {
-    incomingSwingDur = map(swing, 0, 255, clockDivSlave[clockDivSlaveSelect], ((2*clockDivSlave[clockDivSlaveSelect])/3)*2);
-  }
-  seqTrueStep = (seqTrueStep + 1) % 32;
-  /* This will determine which pulse we should play the next step on. 
-   *  
-   */
-  nextStepIncomingPulse = nextStepIncomingPulse + incomingSwingDur; 
-}
-
-void scheduleFlam(byte Track, byte Velocity)
-{
-  if (fxFlam[Track] != 0)
-  {
-    if (Velocity > fxFlamDecay)
-    {
-      track[Track].nextFlamLevel = Velocity - fxFlamDecay;
-      track[Track].nextFlamPulse = clockCounter + fxFlamDelay;
-      fxFlam[Track] = 2;
-    }
-    else
-    {
-      track[Track].nextFlamPulse = 0;
-      for (byte i = 0; i < 12; i++)
-        fxFlam[i] = 0; 
-    }
-  }
-  else if (fxFlam[Track] == 0)
-  {
-    if (Velocity > track[Track].flamDecay)
-    {
-      track[Track].nextFlamLevel = Velocity - track[Track].flamDecay;
-      track[Track].nextFlamPulse = clockCounter + track[Track].flamDelay;
-    }
-    else
-      track[Track].nextFlamPulse = 0;
-  }
-}
-
-void scheduleFlamSlave(byte Track, byte Velocity)
-{
-  byte slaveDelay = map(track[Track].flamDelay, 4, 48, 1, 24);
-  if (fxFlam[Track] != 0)
-  {
-    if (Velocity > fxFlamDecay)
-    {
-      track[Track].nextFlamLevel = Velocity - fxFlamDecay;
-      track[Track].nextFlamPulse = clockCounterSlave + fxFlamDelay;
-      fxFlam[Track] = 2;
-    }
-    else
-    {
-      track[Track].nextFlamPulse = 0;
-      for (byte i = 0; i < 12; i++)
-        fxFlam[i] = 0; 
-    }
-  }
-  else if (fxFlam[Track] == 0)
-  {
-    if (Velocity > track[Track].flamDecay)
-    {
-      track[Track].nextFlamLevel = Velocity - track[Track].flamDecay;
-      track[Track].nextFlamPulse = clockCounterSlave + slaveDelay;
-    }
-    else
-      track[Track].nextFlamPulse = 0;
-  }
-}
-
-
-
-
+#endif
 

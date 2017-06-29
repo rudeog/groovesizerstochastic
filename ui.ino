@@ -1,3 +1,4 @@
+#if 0
 void userControl()
 {
   switch (mode)
@@ -724,9 +725,13 @@ void userControl()
     break;
   }
 }
+#endif
 
 
-
+void uiAcceptInput(void)
+{
+  // TODO main ui loop
+}
 
 
 

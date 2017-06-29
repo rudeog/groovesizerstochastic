@@ -1,10 +1,37 @@
 // midiA.h library info http://playground.arduino.cc/Main/MIDILibrary
 // Reference http://arduinomidilib.fortyseveneffects.com/
 
-byte lastNote = 0;
+// creates a global var that represents midi
+// (size of midi is 183)
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial, midiA);
 
-void HandleNoteOn(byte channel, byte pitch, byte velocity) 
+// used to keep track of when we reach step boundaries
+static uint8_t midiTicks;
+
+// called from the main loop.
+// read midi port, issue callbacks
+void midiUpdate(void)
+{
+  midiA.read();
+}
+
+void midiSendClock(void)
+{
+  midiA.sendRealTime(midi::Clock);
+}
+
+void midiSendStart(void)
+{
+  midiA.sendRealTime(midi::Start);
+}
+
+void midiSendStop(void)
+{
+  midiA.sendRealTime(midi::Stop); // send a midi clock stop signal)  
+}
+static void HandleNoteOn(byte channel, byte pitch, byte velocity) 
 { 
+  #if 0
   // Do whatever you want when you receive a Note On.
   // Try to keep your callbacks short (no delays ect) as the contrary would slow down the loop()
   // and have a bad impact on real-time performance.
@@ -36,48 +63,38 @@ void HandleNoteOn(byte channel, byte pitch, byte velocity)
       }
     }
   }
+  #endif
 }
 
-void HandleNoteOff(byte channel, byte pitch, byte velocity) 
+
+static void HandleNoteOff(byte channel, byte pitch, byte velocity) 
 {
 } 
 
-/* Called 24 times per QN when we are receiving midi clock
- *  
- */
-void HandleClock(void)
-{
-  lastClock = millis();
-  
-  if (syncStarted)
-  {
-    seqRunning = false;
-
-    if (clockCounterSlave >= nextStepIncomingPulse)
-    {
-      playStep();
-      scheduleNextStepSlave();
+// Called 24 times per QN when we are receiving midi clock
+static void HandleClock(void)
+{  
+  if(SLAVE_MODE()) { // slave mode
+    // 6 ticks per step interval
+    if(midiTicks % 6==0) {
+      gRunningState.lastStepTime=millis();
     }
-
-    // see if it's time to play a flam and handle the next one
-    for (byte i = 0; i < 12; i++) // for each of the twelve tracks
-    {
-      if (track[i].nextFlamPulse != 0 && track[i].nextFlamPulse == clockCounterSlave)
-      {
-        handleFlam(i);
-      }
-    }
-    clockCounterSlave++;
   }
+  
+  midiTicks++;
+  if(midiTicks > 23)
+    midiTicks=0;
 }
 
 /* Called when we receive a MIDI start
  *  
  */
-void HandleStart (void)
+static void HandleStart (void)
 {
-    syncStarted = true;
-    seqReset();
+  midiTicks=24; // 0th tick. handleclock will be called next with first timing clock
+  if(SLAVE_MODE()) { // slave mode
+    seqSetTransportState(TRANSPORT_STARTED);
+  }
 }
 
 /* Called when we receive a midi stop
@@ -85,14 +102,34 @@ void HandleStart (void)
  */
 void HandleStop (void)
 {
-  syncStarted = false;
-  seqReset();
-  seqRunning = false;
-  ledsOff();
-  updateLeds();
+  if(SLAVE_MODE()) { // slave mode
+    seqSetTransportState(TRANSPORT_STOPPED);
+  }  
 }
 
+// TODO where do we call this from?
+void midiSetThru(void)
+{
+  if(gSeqState.midiThru) {
+    midiA.turnThruOn(midi::Full);
+  } else {
+    midiA.turnThruOff();
+  }  
+}
 
+void midiSetup(void)
+{
+  // Initiate MIDI communications, listen to all channels
+  midiA.begin(MIDI_CHANNEL_OMNI);    
 
+  // Connect the HandleNoteOn function to the library, so it is called upon reception of a NoteOn.
+  midiA.setHandleNoteOn(HandleNoteOn);  // only put the name of the function here - functions defined in HandleMidi
+  midiA.setHandleNoteOff(HandleNoteOff);
+  midiA.setHandleClock(HandleClock);
+  midiA.setHandleStart(HandleStart);
+  midiA.setHandleStop(HandleStop); 
 
+  // setup based on current sequencer state
+  midiSetThru();
+}
 
