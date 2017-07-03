@@ -48,7 +48,7 @@ struct SeqStep {
 
 struct SeqTrack {
   uint8_t numSteps :5; // length of track 1-32 (add 1)
-  uint8_t clockDivider : 3; //0=default (1x) sets speed 0=1,1=2,2=4x or 3=1/2, 4=1/4, 5=1/8x
+  uint8_t clockDivider : 3; //0=default (1x) sets speed 0=1, 1=2, 2=4x or 3=1/2, 4=1/4, 5=1/8x, 6=3/4
   uint8_t muted : 1;        // muted or not
   uint8_t midiNote : 7; // which midi note it sends
   SeqStep steps[NUM_STEPS]; 
@@ -89,6 +89,8 @@ struct TrackRunningState {
   uint8_t position : 5;       // which step is next (only need 5 bit)
   uint8_t divPosition : 2;    // with clock div=4x each clocked step is divided into 4 parts, used to calculate nextScheduledStart
   uint8_t isScheduled : 1;    // whether or not we have scheduled the next note (reset to 0 when it's been played)
+  uint8_t divComplete : 1;    // if divider is 2x or 4x, this bit will be set after all 2(or 4) steps have played to indicate that 
+                              // we don't want to schedule any more until a proper tick comes in (case for tempo getting slower)
   uint16_t nextScheduledStart;// when it's scheduled to play
 };
 
@@ -106,6 +108,7 @@ struct RunningState {
   // if true, hold the current pattern and don't increase patternCurrentCycle
   uint8_t   patternHold;
   uint16_t  lastStepTime;   // when the last whole step got triggered
+  uint8_t   lastStepTimeTriggered; // timer will set this, scheduler will clear it (bit)
 
   // UI
   uint8_t   currentMode;    // which mode we are in

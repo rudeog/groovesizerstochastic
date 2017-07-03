@@ -5,6 +5,7 @@
 typedef unsigned char uint8_t;
 typedef char int8_t;
 typedef unsigned short uint16_t;
+typedef short int16_t;
 typedef unsigned int uint32_t;
 
 
@@ -18,7 +19,6 @@ typedef unsigned int uint32_t;
 #define DEFAULT_MIDI_NOTE 60
 
 #define TRANSPORT_STOPPED   0
-#define TRANSPORT_PAUSED    1
 #define TRANSPORT_STARTED   2
 
 #define MODE_NORMAL         0 // turn on and off steps, switch tracks, mute tracks
@@ -34,7 +34,9 @@ struct SeqStep {
 
 struct SeqTrack {
    uint8_t numSteps : 5; // length of track 1-32 (add 1)
-   uint8_t clockDivider : 3; //0=default (1x) sets speed 0=1,1=2,2=4x or 3=1/2, 4=1/4, 5=1/8x
+   //supported: 1x, 2x, 4x, 1/4x, 1/2x, 3/4x 
+   uint8_t clockDividerNum : 2; // numerator for clock divider (0 based so 0=1)
+   uint8_t clockDividerDenom : 2; // denominator for clock divider (0 based)
    uint8_t muted : 1;        // muted or not
    uint8_t midiNote : 7; // which midi note it sends
    SeqStep steps[NUM_STEPS];
@@ -72,19 +74,25 @@ struct SequencerState {
 
 struct TrackRunningState {
    uint8_t position : 5;       // which step is next (only need 5 bit)
-   uint8_t divPosition : 2;    // with clock div=4x each clocked step is divided into 4 parts, used to calculate nextScheduledStart
+   // the reason these two have more bits than is needed is because we need to be able to have
+   // as state where we know their cycle is complete
+   uint8_t numCycle : 3;       // incremented whenever we schedule a step when clockDiv is 4x, 2x or 3/4                               
+   uint8_t denomCycle : 3;     // incremented whenever we get a clock step when clockDiv is 1/4, 1/2 or 3/4
    uint8_t isScheduled : 1;    // whether or not we have scheduled the next note (reset to 0 when it's been played)
-   uint8_t divComplete : 1;    // if divider is 2x or 4x, this bit will be set after all 2(or 4) steps have played to indicate that 
-                               // we don't want to schedule any more until a proper tick comes in (case for tempo getting slower)
+   
    uint16_t nextScheduledStart;// when it's scheduled to play
 };
 
 struct RunningState {
    uint8_t   tempo;      // current actual tempo (calculated or determined from seq state)
    TrackRunningState  trackPositions[NUM_TRACKS]; // which position on each track we played last (only need 5 bits per)
-                                                  // which pattern we are playing and editing (could use 2 bits)
+
+    // which pattern we are playing and editing (could use 2 bits)
    uint8_t   pattern;
-   // which pattern needs to be switched to at end of bar? overrides programmed switch
+   // which pattern needs to be switched to
+   // This will be set when the user hits a button. it overrides the auto pattern switch
+   // default value is NUM_PATTERNS (since its 0 based)
+   // the pattern switch will either occur now, or end of current pattern if set to do so
    uint8_t   nextPattern;
    // nth cycle of current pattern - to determine when to switch (could use 4 bits)
    uint8_t   patternCurrentCycle;
@@ -94,11 +102,12 @@ struct RunningState {
    uint8_t   patternHold;
    uint16_t  lastStepTime;   // when the last whole step got triggered
    uint8_t   lastStepTimeTriggered; // timer will set this, scheduler will clear it (bit)
+   uint8_t   patternHasPlayed;      // will be set to true whenever a whole pattern (ie track 1 of a pattern) has played
+   // we need it for if tempo changes - we might need to throw away steps
 
-                                    // UI
+   // UI
    uint8_t   currentMode;    // which mode we are in
-   uint8_t   currentPattern; // which pattern is current
-   uint8_t   currentTrack;   // which track is current
+   uint8_t   currentTrack;   // which track is currently displayed
    uint8_t   currentStep;    // which step is being edited
 
 };

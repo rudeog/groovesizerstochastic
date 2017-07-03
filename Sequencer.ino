@@ -16,6 +16,46 @@ void seqSetup(void)
   }
 }
 
+/*
+ * scheduleNext: This is called from main loop. lastStepTime will be set to the last time that
+ * a 4ppq clock tick occurred (ie a step). Under normal circumstances, we will schedule the next play time
+ * of the track for that time. However we might have a clock divider or a swing to take into account.
+ * Clock divider:
+ *   4x or 2x:
+ *     These need to occur 4 times (or 2) for each step, so we will use divPosition to determine where we are
+ *     example (divider is 4x):
+ *     isScheduled is false, lastStepTimeTriggered is true, we set it to false in this fn
+ *     lastStepTime is set to 10 track position is 0 (no steps have played). divPosition is 0
+ *     we set scheduledStart to 10, increment divPosition to 1 and set isScheduled to true
+ *     (another function picks up the scheduled time, plays the note and clears isScheduled, sets trackposition to 1)
+ *     lastStepTime is still 10, track position is 1 (1 step has played). divPosition is 1
+ *     we set scheduledStart to 10+((divPosition) * (length of step/divider) ), increment divPosition to 2 (divider is 4)
+ *     when divPosition would overflow to 0 we don't want to schedule anything else until we get a new scheduledStart time divComplete is set true
+ *     lastStepTime is 10, isSched is false, lsttrig is false, if divComplete is true, do nothing
+ *     lastStepTime is 20 (next step), track position should be 4, divPosition should be 0 (but might be other if tempo sped up)
+ *     if divposition is nonzero, increment position by (4-divposition) and set it to 0
+ *     set schedStart to 20, increment divPosition to 1 and isSChed to true
+ *     if divComplete flag was set, clear it
+ *     
+ *     when lastStepTimeTriggered is true, we need to assume that we are on a whole step boundary. This becomes important
+ *     if the tempo is changing in real time. For example, if tempo was 80, clock div is 4, and tempo changes to 160 and we've
+ *     played two steps, we don't want to be two steps off from the real beat (hard to explain, draw it)
+ *     - if divPosition is non-zero we will skip 4-divPosition steps to ensure that steps line up properly
+ *     
+ *     example (divider is 1/4x) 4x slower than tempo:
+ *     isScheduled is false, lastStepTrig is true, we set it to false
+ *     lastSteptime is 10 position 0, divPosition 0
+ *     set schedstart to 10, increment divPosition to 1 and set isSched to true
+ *     (another fn plays it, sets tp to 1...)
+ *     another call, lastStepTimeTriggered is false, isSched is now false, we see that divPosition is non-zero so we do nothing 
+ *     another call, lastStepTimeTriggered is true, but since divPosition is non-zero, we just increment it and do nothing else 
+ *     another call, lastStepTimeTriggered is true, divPosition is zero, we schedule the next step
+ *     
+ *     example divider is 3/4x:
+ *     same as above but...
+ *     
+ *     
+ */
 void scheduleNext(void)
 {
   // swing is only applied when clock div <= 1
@@ -69,7 +109,8 @@ void seqSetTransportState(uint8_t state)
   
   if(gRunningState.transportState==TRANSPORT_STOPPED) {
     // reset all track positions to 0
-    memset(gRunningState.trackPositions,0,NUM_TRACKS);
+    // TODO 
+    
   }
 
   // if we are sending midi clock, send start/stop
