@@ -1,4 +1,5 @@
 #pragma once
+#define _CRT_SECURE_NO_WARNINGS
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,10 +8,11 @@ typedef char int8_t;
 typedef unsigned short uint16_t;
 typedef short int16_t;
 typedef unsigned int uint32_t;
-
+#pragma pack(push, 1)
 
 // Definitions 
 #define NUM_STEPS       32
+#define DEFAULT_NUM_STEPS 16
 #define NUM_TRACKS      6
 #define NUM_PATTERNS    4
 #define DEFAULT_BPM     120       // until we get clock sync, we assume this bpm, also to start with it will be this
@@ -19,7 +21,7 @@ typedef unsigned int uint32_t;
 #define DEFAULT_MIDI_NOTE 60
 
 #define TRANSPORT_STOPPED   0
-#define TRANSPORT_STARTED   2
+#define TRANSPORT_STARTED   1
 
 #define MODE_NORMAL         0 // turn on and off steps, switch tracks, mute tracks
 #define MODE_EDIT_STEP      1 // edit individual steps
@@ -38,8 +40,10 @@ struct SeqTrack {
    uint8_t clockDividerNum : 2; // numerator for clock divider (0 based so 0=1)
    uint8_t clockDividerDenom : 2; // denominator for clock divider (0 based)
    uint8_t muted : 1;        // muted or not
+
    uint8_t midiNote : 7; // which midi note it sends
    SeqStep steps[NUM_STEPS];
+   uint8_t lastRandom : 4; // 0..15 current random value for track
 };
 
 struct SeqPattern {
@@ -55,16 +59,12 @@ struct SequencerState {
    SeqPattern patterns[NUM_PATTERNS]; // about 828 bytes
    uint8_t midiChannel;        // which midi channel we are sending on (0 based)
    uint8_t tempo;              // 0=slave (respond to start/stop hopefully as well?)
-   int8_t  swing;              // move forward or backward
+   int8_t  swing;              // move back only 0..100 where 100 is on the next step
    int8_t  randomRegen;        // generate a new random number every n steps (1..32)
    int8_t  delayPatternSwitch; // whether to delay switching patterns till end of pattern
    uint8_t midiSendClock;      // whether we are sending clock
    uint8_t midiThru;           // whether we are doing thru
 };
-
-
-// use this to figure out size at compile time (currently 835)
-//char (*__kaboom)[sizeof( gSeqState )] = 1;
 
 #define SLAVE_MODE() (gSeqState.tempo==0)
 
@@ -89,7 +89,7 @@ struct RunningState {
 
     // which pattern we are playing and editing (could use 2 bits)
    uint8_t   pattern;
-   // which pattern needs to be switched to
+   // which pattern needs to be switched to (user request only, not autoswitch)
    // This will be set when the user hits a button. it overrides the auto pattern switch
    // default value is NUM_PATTERNS (since its 0 based)
    // the pattern switch will either occur now, or end of current pattern if set to do so
@@ -101,7 +101,9 @@ struct RunningState {
    // if true, hold the current pattern and don't increase patternCurrentCycle
    uint8_t   patternHold;
    uint16_t  lastStepTime;   // when the last whole step got triggered
+   uint16_t  lastDivStartTime;  // when the last time we started a div cycle (ie 1/4, 1/2 or 3/4 time cycle)
    uint8_t   lastStepTimeTriggered; // timer will set this, scheduler will clear it (bit)
+   uint8_t haveClockTick; // (bit) will be set whenever we get a clock tick (midi or internal)
    uint8_t   patternHasPlayed;      // will be set to true whenever a whole pattern (ie track 1 of a pattern) has played
    // we need it for if tempo changes - we might need to throw away steps
 
@@ -111,7 +113,7 @@ struct RunningState {
    uint8_t   currentStep;    // which step is being edited
 
 };
-
+#pragma pack(pop)
 extern RunningState gRunningState;
 extern SequencerState gSeqState;
 

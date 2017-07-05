@@ -48,8 +48,9 @@ void clockSetBPM(uint8_t BPM)
     // TODO start receiving midi clock
   } else {
     gRunningState.tempo=BPM;
-    // use 96 ticks per beat
-    Timer1.setPeriod(1000000/((BPM/60)*96)); // with period in microseconds (same as 1000000*60/BPM/96)
+    // use 24 ticks per beat - same as midi clock
+    // TODO check for big rounding, or intermediate overflow
+    Timer1.setPeriod(1000000/(BPM*24/60)); // with period in microseconds (same as 1000000*60/BPM/24)
     Timer1.attachInterrupt(internalClock);
   }
 }
