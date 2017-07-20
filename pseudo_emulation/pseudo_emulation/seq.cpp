@@ -2,13 +2,33 @@
 #include <stdarg.h>
 #define DEFAULT_LOG_FILE "c:\\crap\\seqlog.txt"
 #define COPY_LOG_FILE_SPEC "c:\\crap\\seqlog%d.txt"
+#define SAVE_OUTPUT_FILE "c:\\crap\\seqoutput.txt"
 // state for this program (non-native)
 
 // represents "real" time in microseconds
 int xxCurrentTime = 0;
+// higher is more detailed (0..5)
+int xxLogLevel = 1;
 FILE *xxLog;
 FILE *xxInputStream;
+FILE *xxDumpFile;
 
+void outputStringVA(const char *format, va_list valist)
+{
+   vprintf(format, valist);
+   if (xxDumpFile)
+      vfprintf(xxDumpFile, format, valist);
+}
+
+void outputString(const char *format, ...)
+{
+   static int last = 0;
+   va_list args;
+   va_start(args, format);
+   outputStringVA(format, args);
+   va_end(args);
+
+}
 void fcopy(FILE *f1, FILE *f2)
 {
    char            buffer[BUFSIZ];
@@ -17,7 +37,7 @@ void fcopy(FILE *f1, FILE *f2)
    while ((n = fread(buffer, sizeof(char), sizeof(buffer), f1)) > 0)
    {
       if (fwrite(buffer, sizeof(char), n, f2) != n)
-         printf("write failed\n");
+         outputString("write failed\n");
    }
 }
 
@@ -28,25 +48,28 @@ void fileCopy(const char *s, const char *d)
    FILE *fp2;
 
    if ((fp1 = fopen(s, "rb")) == 0)
-      printf("cannot open file %s for reading\n", s);
+      outputString("cannot open file %s for reading\n", s);
    if ((fp2 = fopen(d, "wb")) == 0)
-      printf("cannot open file %s for writing\n", d);
+      outputString("cannot open file %s for writing\n", d);
    fcopy(fp1, fp2); 
    fclose(fp1);
    fclose(fp2);
 }
 
 
-void logMessage(const char *format, ...)
+
+void logMessage(int level, const char *format, ...)
 {
    static int last = 0;
    va_list args;
-   printf("%5d (el:%4d): ", xxCurrentTime/1000, (xxCurrentTime / 1000)-last);
+   if (level > xxLogLevel)
+      return;
+   outputString("%5d (el:%4d): ", xxCurrentTime/1000, (xxCurrentTime / 1000)-last);
    last = xxCurrentTime / 1000;
    va_start(args, format);
-   vprintf(format, args);
+   outputStringVA(format, args);
    va_end(args);
-   printf("\n");
+   outputString("\n");
 }
 uint32_t millis()
 {
@@ -59,7 +82,7 @@ void midiSendClock()
 void playStep(int track, int position, int chan, int note, int vel)
 {
    // todo random check, mute check, send midi note
-   logMessage("[play] pat %1d tr %1d st %2d: ch %d note %d vel %d", 
+   logMessage(0, "[play] pat %1d tr %1d st %2d: ch %d note %d vel %d", 
       gRunningState.pattern + 1, track + 1, position + 1,
       chan+1, note, vel);
 }
@@ -117,7 +140,7 @@ pcg_setseq_8_rxs_m_xs_8_boundedrand_r(struct pcg_state_setseq_8* rng,
       uint8_t r = pcg_setseq_8_rxs_m_xs_8_random_r(rng);
       if (r >= threshold)
          return r % bound;
-      logMessage("Random thoughts...");
+      logMessage(1,"Random thoughts...");
    }
 }
 
@@ -184,7 +207,7 @@ static void switchToPattern(uint8_t pattern)
    if (pattern == NUM_PATTERNS) // don't switch, just initialize
       pattern = gRunningState.pattern;
 
-   logMessage("[pattern switch] pattern %d", pattern + 1);
+   logMessage(0,"[pattern switch] pattern %d", pattern + 1);
    gRunningState.pattern = pattern;
    gRunningState.patternCurrentCycle = 0;
    gRunningState.patternHasPlayed = 0;
@@ -265,7 +288,7 @@ static uint8_t determineNextPattern()
    tot += (probs[1] >> 4);   // pat 3
    if (rnd < tot) return 3;
 
-   printf("Sprunt!\n"); // should never see this
+   outputString("Sprunt!\n"); // should never see this
    exit(0);
 
    return NUM_PATTERNS;
@@ -354,7 +377,7 @@ void seqScheduleNext(void)
             // todo make sure it's explicit that randomRegen is 1 based or fix this
             if (trState->position % gSeqState.randomRegen == 0) {
                track->lastRandom = random(16);
-               logMessage("Regenerate random for track %d ... %d", i, track->lastRandom);
+               logMessage(1,"Regenerate random for track %d ... %d", i, track->lastRandom);
             }
 
 
@@ -384,6 +407,7 @@ void seqScheduleNext(void)
                // these in the past which means they will play right away and we
                // will catch up (I think I observed this, but who knows if I'm missing something...)
                trState->nextScheduledStart = gRunningState.lastStepTime+swing;
+               logMessage(1, "Scheduled track %d for %d", i + 1, trState->nextScheduledStart);
                trState->isScheduled = 1;
                trState->numCycle = 0; // allow interpolation again
             } // if !denomCycle
@@ -514,7 +538,7 @@ void advanceClock(int increment)
          loop();
       xxCurrentTime++;
    }
-   printf("\n");
+   outputString("\n");
 
 
 }
@@ -531,7 +555,7 @@ Command cmds[] = {
    {"div","<num> <denom> set divider num/denom"}, //2
    {"len","<len> set track len (pass 1 based)" }, //3
    {"tempo","<n> set tempo to n" }, //4
-   {"show", "<n> show everything. if n is 1 it shows track shit too" }, //5
+   {"show", "<n> show everything. if n is there it shows track n info too" }, //5
    {"track", "<n> set track to <n> (pass 1 based)" }, //6
    {"play",  "<n> where n is 0=stop, 1=play" }, //7
    {"random","<n> generate a number from 0 to n-1" }, //8
@@ -543,8 +567,10 @@ Command cmds[] = {
    {"step", "<stepnum> <vel> <prob> set vel (0..15), prob (1..16) vel 0=off"}, //14
    {"qstep","<n n n...> Turn steps on/off (0=off)"}, //15
    {"regen","<n> Regenerate random every n steps (1..32)" }, //16
-   { "swing","<n> set swing to n (0..100)" }, //17
-   
+   {"swing","<n> set swing to n (0..100)" }, //17
+   {"patprob","<n> <n> <n> <n> Switch probability (n: target pattern, 0-15, 0=never)"}, // 18
+   {"patrep","<n> Times to repeat pattern (1..16)" }, // 19
+   {"pathold","<n> If 1 will hold the pattern indefinitely" }, // 20   
    { 0,0 }
 };
 
@@ -552,7 +578,7 @@ void showCommands()
 {
    Command *c = cmds;
    while (c->cmd) {
-      printf("%6s - %s\n", c->cmd, c->help);
+      outputString("%6s - %s\n", c->cmd, c->help);
       c++;
    }
 
@@ -584,14 +610,22 @@ reRead:
    if (0 == fgets(cmdbuf, 255, xxInputStream)) {
       if (feof(xxInputStream)) {
          if (xxInputStream != stdin) {
+            // switch back to stdin for reading commands
             fclose(xxInputStream);
             xxInputStream = stdin;
             goto reRead;
          }
       }
    }
-   if (xxInputStream != stdin) {
-      printf("%s", cmdbuf);
+
+   if (xxInputStream != stdin) { // if reading commands from file, dump it out for informational purposes
+      outputString("%s", cmdbuf);
+   }
+
+   // write it to dump file
+   if (xxDumpFile)
+   {
+      fprintf(xxDumpFile, cmdbuf);
    }
 
    strcpy(savebuf, cmdbuf);
@@ -633,26 +667,34 @@ reRead:
 
 void showState(bool track)
 {
-   printf("[Pat %d Trk %d Time %dms]\n"
+   outputString("[Pat %d %sTrk %d Time %dms]\n"
       "Tempo %d, swing %d (clock every %dms, 16th step every %dms) %s\n",
       gRunningState.pattern + 1,
+      gRunningState.patternHold ? "(HOLD) " : "",
       gRunningState.currentTrack + 1,
       xxCurrentTime / 1000,
-
       (int)gSeqState.tempo,
       gSeqState.swing,
       (1000*60/24) / gSeqState.tempo,
       (1000 *60/4) / gSeqState.tempo ,
       gRunningState.transportState ==TRANSPORT_STARTED ?  "started" : "stopped"
    );
-   printf("Regen every %d steps. MIDI channel %d\n", gSeqState.randomRegen, gSeqState.midiChannel);
+   outputString("Regen every %d steps. MIDI channel %d\n", gSeqState.randomRegen, gSeqState.midiChannel);
    if (gRunningState.nextPattern < NUM_PATTERNS) {
-      printf("Next pattern %d (%s)\n", gRunningState.nextPattern + 1,
+      outputString("Next pattern %d (%s)\n", gRunningState.nextPattern + 1,
          gSeqState.delayPatternSwitch ? "delay" : "immediate");
    }
 
+   outputString("Pattern repeats %d. Probabilities: 1=%d 2=%d 3=%d 4=%d\n",
+      gSeqState.patterns[gRunningState.pattern].numCycles+1,
+      (gSeqState.patterns[gRunningState.pattern].nextPatternProb[0] & 0xf),
+      (gSeqState.patterns[gRunningState.pattern].nextPatternProb[0] >> 4),
+      (gSeqState.patterns[gRunningState.pattern].nextPatternProb[1] & 0xf),
+      (gSeqState.patterns[gRunningState.pattern].nextPatternProb[1]  >> 4));
+
+
    for (int i = 0; i < NUM_TRACKS; i++) {
-      printf("Track %d: steps: %d divider(%d/%d) MIDI %d %s\n", i + 1,
+      outputString("Track %d: steps: %d divider(%d/%d) MIDI %d %s\n", i + 1,
          gSeqState.patterns[gRunningState.pattern].tracks[i].numSteps + 1,
          gSeqState.patterns[gRunningState.pattern].tracks[i].clockDividerNum+1,
          gSeqState.patterns[gRunningState.pattern].tracks[i].clockDividerDenom + 1,
@@ -663,7 +705,7 @@ void showState(bool track)
 
    if (track) {
       int i;
-      printf("Track state (top row velocity bottom row prob)\n");
+      outputString("CURRENT Track (%d) state (top row velocity bottom row prob)\n", gRunningState.currentTrack+1);
       SeqTrack *tr = &gSeqState.patterns[gRunningState.pattern].tracks[gRunningState.currentTrack];
       for (int cycle = 0; cycle < 2; cycle++) {
          int start = cycle * 16;
@@ -671,23 +713,23 @@ void showState(bool track)
          if (len > tr->numSteps+1)
             len = tr->numSteps+1;
          for (i = start; i < len; i++) {
-            printf("%02d_", i + 1);
+            outputString("%02d_", i + 1);
          }
          if(start<len)
-            printf("\n");
+            outputString("\n");
          for (i = start; i < len; i++) {
             if (tr->steps[i].velocity)
-               printf("%02d ", tr->steps[i].velocity);
+               outputString("%02d ", tr->steps[i].velocity);
             else
-               printf("   ");
+               outputString("   ");
          }
          if (start<len)
-            printf("\n");
+            outputString("\n");
          for (i = start; i < len; i++) {
             if (tr->steps[i].velocity)
-               printf("%02d ", tr->steps[i].probability+1);
+               outputString("%02d ", tr->steps[i].probability+1);
             else
-               printf("   ");
+               outputString("   ");
          }
          if (start<len)
             printf("\n");
@@ -707,7 +749,12 @@ void doSequencer()
    xxInputStream = stdin; // reading cmds from stdin
    xxLog = fopen(DEFAULT_LOG_FILE, "w");
    if (!xxLog) {
-      printf("Failed to create " DEFAULT_LOG_FILE "\n");
+      outputString("Failed to create " DEFAULT_LOG_FILE "\n");
+      return;
+   }
+   xxDumpFile = fopen(SAVE_OUTPUT_FILE, "w");
+   if (!xxDumpFile) {
+      outputString("Failed to create " SAVE_OUTPUT_FILE "\n");
       return;
    }
    seqSetup();
@@ -718,11 +765,11 @@ void doSequencer()
       stateTrack = &statePattern->tracks[gRunningState.currentTrack];
       runTrack = &gRunningState.trackPositions[gRunningState.currentTrack];
 
-      printf("%dms >", xxCurrentTime / 1000);
+      outputString("%dms >", xxCurrentTime / 1000);
       c = getCommand(params, &pc);
       switch (c) {
       case -1:
-         printf("Available commands:\n");
+         outputString("Available commands:\n");
          showCommands();
          break;
       case 0: // quit
@@ -738,7 +785,7 @@ void doSequencer()
          int denom = params[1];
          // todo others are unsupported
          if (num < 1 || num >4 || denom < 1 || denom >4 || denom == 3) {
-            printf("unsupported clock divider\n");
+            outputString("unsupported clock divider\n");
          }
          else {
             stateTrack->clockDividerNum = num - 1;
@@ -749,7 +796,7 @@ void doSequencer()
       break;
       case 3: // len
          if (params[0] > 32 || params[0] < 1) {
-            printf("Invalid len (1-32)\n");
+            outputString("Invalid len (1-32)\n");
          }
          else {
             stateTrack->numSteps = params[0] - 1;
@@ -758,7 +805,7 @@ void doSequencer()
          break;
       case 4: // tempo
          if (params[0] > 255 || params[0] < 1)
-            printf("Invalid tempo (1-255)\n");
+            outputString("Invalid tempo (1-255)\n");
          else
             gSeqState.tempo = params[0];
          break;
@@ -768,35 +815,35 @@ void doSequencer()
       case 6: // set current track (1 based)
          if (params[0] > 0 && params[0] < 7) {
             gRunningState.currentTrack = params[0] - 1;
-            printf("Track set to %d\n", params[0]);
+            outputString("Track set to %d\n", params[0]);
          }
          else {
-            printf("Invalid track\n");
+            outputString("Invalid track\n");
          }
          break;
       case 7: // transport 0=stop, 1=play
          if (params[0] == TRANSPORT_STOPPED || params[0] == TRANSPORT_STARTED)
             seqSetTransport(params[0]);
          else
-            printf("Invalid state [0 stop, 1 start]\n");
+            outputString("Invalid state [0 stop, 1 start]\n");
          break;
       case 8: // random
-         printf("random number from 0 to %d inclusive is: %d\n", params[0] - 1, random(params[0]));
+         outputString("random number from 0 to %d inclusive is: %d\n", params[0] - 1, random(params[0]));
          break;
       case 9: // mute a track
          if (params[0] > 0 && params[0] < 7 && params[1] >= 0 && params[1] <= 1) {
             gSeqState.patterns[gRunningState.pattern].tracks[params[0] - 1].muted =
                params[1];
-            printf("Track %d %s\n", params[0], params[1] ? "muted" : "unmuted");
+            outputString("Track %d %s\n", params[0], params[1] ? "muted" : "unmuted");
          }
          else {
-            printf("Invalid track\n");
+            outputString("Invalid track\n");
          }
          break;
       case 10: // switch pat
          if (params[0] < 1 || params[0] > NUM_PATTERNS ||
             params[1] < 0 || params[1] > 1)
-            printf("Invalid pattern or delay setting\n");
+            outputString("Invalid pattern or delay setting\n");
          else {
             seqSetPattern(params[0] - 1);
             gSeqState.delayPatternSwitch = params[1];
@@ -818,7 +865,7 @@ void doSequencer()
          xxInputStream = fopen(fnbuf, "r");
          if (!xxInputStream) {
             xxInputStream = stdin;
-            printf("File open failed for %s\n", fnbuf);
+            outputString("File open failed for %s\n", fnbuf);
          }
          break;
       }
@@ -826,7 +873,7 @@ void doSequencer()
          if (params[0] >= 0 && params[0] < 128)
             stateTrack->midiNote = params[0];
          else
-            printf("You dullard! Enter a proper range\n");
+            outputString("You dullard! Enter a proper range\n");
          break;
       case 14: // step vel prob 0..15 1..16
          if (params[0] >= 1 && params[0] <= NUM_STEPS && 
@@ -837,7 +884,7 @@ void doSequencer()
             stateTrack->steps[params[0] - 1].probability = params[2]-1;
          }
          else {
-            printf("Out of range for one of those. Try again\n");
+            outputString("Out of range for one of those. Try again\n");
          }
          break;
       case 15: // qstep
@@ -856,18 +903,55 @@ void doSequencer()
          if (params[0] >= 1 && params[0] <= NUM_STEPS)
             gSeqState.randomRegen = params[0];
          else
-            printf("Range is 1..32\n");
+            outputString("Range is 1..32\n");
          break;
       case 17: // swing
          if (params[0] >= 0 && params[0] <= 100)
             gSeqState.swing = params[0];
          else
-            printf("Range is 0..100\n");
+            outputString("Range is 0..100\n");
+         break;
+      case 18: // pattern probability 0..15
+         for (int pp = 0; pp < 4; pp++) {
+            int idx = pp / 2;
+            if (params[pp] < 0 || params[pp] > 15) {
+               outputString("Range is 0..15. Pattern %d not changed\n", pp+1);
+            }
+            else {
+               if (pp % 2 == 0) { // low nibble
+                  statePattern->nextPatternProb[idx] &= 0xF0; // clear low nibble
+                  statePattern->nextPatternProb[idx] |= params[pp]; // set it
+               }
+               else { // high nibble
+                  statePattern->nextPatternProb[idx] &= 0x0F; // clear high nibble
+                  statePattern->nextPatternProb[idx] |= (params[pp] << 4); // set it
+               }
+            }            
+         }
+         break;
+      case 19: // pattern num repeats 1..16
+         if (params[0] < 1 || params[0] > 16) {
+            outputString("Invalid number of repeats (1..16)\n");
+         }
+         else {
+            statePattern->numCycles = params[0] - 1;
+         }
+
+         break;
+      case 20: // pattern hold on or off
+         if (params[0] > 0)
+            gRunningState.patternHold = 1;
+         else
+            gRunningState.patternHold = 0;
          break;
       
       } // end case
    } // end for(;;)
 
 end:
-   ;
+   if (xxLog)
+      fclose(xxLog);
+   if (xxDumpFile)
+      fclose(xxDumpFile);
+   
 }
