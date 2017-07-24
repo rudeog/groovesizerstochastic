@@ -12,11 +12,16 @@
 ifdef VERBOSE
 ECHO := @true
 AT :=
-LDFLAGS += -v
+#LDFLAGS += -v
 else
 # prefix a command with @ and it will not echo the output
 AT :=@
 ECHO := @echo
+endif
+
+checkforgcc := $(shell which avr-gcc 1>/dev/null 2>/dev/null && echo "yes" || echo "no" ) #1> /dev/null 2>&1; echo $$?)
+ifneq ("$(strip $(checkforgcc))","yes")
+$(error AVR path is not set! Add the avr bin directory to the path or set AVR_TOOLKIT_ROOT )
 endif
 
 ifneq ("$(strip $(AVR_TOOLKIT_ROOT))","")
@@ -33,27 +38,42 @@ LD  =$(addprefix $(BINPATH),avr-ld)
 CP  =$(addprefix $(BINPATH),avr-objcopy)
 OD  =$(addprefix $(BINPATH),avr-objdump)
 AS  =$(addprefix $(BINPATH),avr-as)
-AR  =$(addprefix $(BINPATH),avr-ar)
+AR  =$(addprefix $(BINPATH),avr-gcc-ar)
 DUDE=$(addprefix $(BINPATH),avrdude)
 SIZ =$(addprefix $(BINPATH),avr-size)
 
-###############################################################################
-# SOURCE FILES
-SRCDIR=./
+SRCDIR=./src
 CSRCFILES    = $(shell find $(SRCDIR) -type f -name "*.c"  )
 CPPSRCFILES  = $(shell find $(SRCDIR) -type f -name "*.cpp"  )
 ASSRCFILES   = $(shell find $(SRCDIR) -type f -name "*.S"  )
+COBJFILES    = $(addprefix $(OBJDIR),$(notdir $(CSRCFILES:.c=.o)))
+CPPOBJFILES  = $(addprefix $(OBJDIR),$(notdir $(CPPSRCFILES:.cpp=.o)))
+ASOBJFILES   = $(addprefix $(OBJDIR),$(notdir $(ASSRCFILES:.S=.o)))
+SRCFILES     = $(CSRCFILES) $(CPPSRCFILES) $(ASSRCFILES)
+OBJFILES     = $(COBJFILES) $(CPPOBJFILES) $(ASOBJFILES)
+
+COREDIR=./core
+CCOREFILES    = $(shell find $(COREDIR) -type f -name "*.c"  )
+CPPCOREFILES  = $(shell find $(COREDIR) -type f -name "*.cpp"  )
+ASCOREFILES   = $(shell find $(COREDIR) -type f -name "*.S"  )
+CCOREOBJFILES    = $(addprefix $(OBJDIR),$(notdir $(CCOREFILES:.c=.o)))
+CPPCOREOBJFILES  = $(addprefix $(OBJDIR),$(notdir $(CPPCOREFILES:.cpp=.o)))
+ASCOREOBJFILES   = $(addprefix $(OBJDIR),$(notdir $(ASCOREFILES:.S=.o)))
+CORESRCFILES     = $(CCOREFILES) $(CPPCOREFILES) $(ASCOREFILES)
+COREOBJFILES     = $(CCOREOBJFILES) $(CPPCOREOBJFILES) $(ASCOREOBJFILES)
+
 
 # add locations to search for files
 vpath %.cpp ./core
-vpath %.c ./core
-vpath %.cpp ./wire
-vpath %.c ./wire/utility
-vpath %.c ./wire
-vpath %.cpp ./eeprom
-vpath %.cpp ./midi
-vpath %.cpp ./timerone
+vpath %.cpp ./core/wire
+vpath %.cpp ./core/eeprom
+vpath %.cpp ./core/midi
+vpath %.cpp ./core/timerone
 vpath %.cpp ./src
+vpath %.c ./core
+vpath %.c ./core/wire/utility
+vpath %.c ./core/wire
+
 
 # SETUP
 OPTIMIZE=s
@@ -62,25 +82,19 @@ OBJDIR=./build/
 BINARY = $(OBJDIR)stocha.hex
 MAP    = $(OBJDIR)stocha.map
 ELF    =$(OBJDIR)stocha.elf
-
-# Build object files from source...
-COBJFILES   = $(addprefix $(OBJDIR),$(notdir $(CSRCFILES:.c=.o)))
-CPPOBJFILES = $(addprefix $(OBJDIR),$(notdir $(CPPSRCFILES:.cpp=.o)))
-ASOBJFILES  = $(addprefix $(OBJDIR),$(notdir $(ASSRCFILES:.S=.o)))
-
-OBJFILES    = $(COBJFILES) $(CPPOBJFILES) $(ASOBJFILES)
+CORE   =$(OBJDIR)core.a
 
 # Project defines
 DEFINES = -DF_CPU=16000000L -DARDUINO=10802 -DARDUINO_AVR_UNO -DARDUINO_ARCH_AVR
 
 # Include directories
 INCLUDES += -I"./core"
-INCLUDES += -I"./eeprom"
-INCLUDES += -I"./midi"
-INCLUDES += -I"./pins"
-INCLUDES += -I"./timerone"
-INCLUDES += -I"./wire"
-INCLUDES += -I"./src"
+INCLUDES += -I"./core/eeprom"
+INCLUDES += -I"./core/midi"
+INCLUDES += -I"./core/pins"
+INCLUDES += -I"./core/timerone"
+INCLUDES += -I"./core/wire"
+INCLUDES += -I"./core/src"
 
 # options to pass compiler for the different targets
 OPTS    = -c -g -flto -mmcu=atmega328p
@@ -105,8 +119,9 @@ all:
 	@echo " fw : build firmware"
 	@echo " upload : upload firmware to device"
 	@echo " clean : clean build directory"
-	@echo " printfiles : print list of files that would be compiled"
-
+	@echo " showfiles : print list of files that would be compiled"
+	@echo " showsize : display memory usage of final firmware image"
+	
 .PHONY: clean
 clean:
 	@$(RM) $(BINARY)
@@ -125,27 +140,31 @@ upload:
 	@echo "CXX = $(CXX)"
 	@echo "AS  = $(AS)"
 
-.PHONY: printfiles
-printfiles:
-	@echo "** C FILES **"
-	@echo "$(CSRCFILES)"
-	@echo ""
-	
-	@echo "** CPP FILES **"
-	@echo "$(CPPSRCFILES)"
+.PHONY: showfiles
+showfiles:
+	@echo "Files that will be built:"
+	@echo "$(SRCFILES)"
+	@echo "Core files that will be built:"
+	@echo "$(CORESRCFILES)"
 
-	@echo "** S FILES **"
-	@echo "$(ASSRCFILES)"	
 .PHONY: fw
 fw: $(BINARY)
 
-$(ELF): $(OBJFILES)
+$(ELF): $(OBJFILES) $(CORE)
 	$(ECHO) "Linking $@..."
 	$(AT)$(CC) $(LDFLAGS) $^ -o $@
 
 $(BINARY): $(ELF)
 	$(ECHO) "Creating hex $@..."
 	$(AT)$(CP) -O ihex -R .eeprom $^ $@
+
+$(CORE): $(COREOBJFILES)
+	$(ECHO) "Conjuring core..."
+	$(AT)rm $(CORE)
+	$(AT)$(AR) rcs $@ $^ 
+	
+.PHONY: showsize	
+showsize:
 	$(AT)$(SIZ) -C --mcu=atmega328p $(ELF)
 
 

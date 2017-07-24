@@ -1,0 +1,2 @@
+export PATH=/e/codez/arduino-1.8.2/hardware/tools/avr/bin:$PATH
+
