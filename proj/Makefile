@@ -187,7 +187,7 @@ $(OBJDIR)%.o: %.S
 	$(AT)$(AS) $(ASMFLAGS) $< -o $@ > $@.lst
 
 # Automatic dependency generation
-#CFLAGS += -MMD
-#CPPFLAGS += -MMD
-#ASMFLAGS += -MMD
-#-include $(OBJFILES:.o=.d)
+CFLAGS += -MMD
+CPPFLAGS += -MMD
+ASMFLAGS += -MMD
+-include $(OBJFILES:.o=.d)
