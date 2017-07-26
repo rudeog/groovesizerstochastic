@@ -9,6 +9,7 @@
 // BUTTONS
 // 5 x 8 = 40 --- do the math
 #define BUTTON_BYTES 5
+#define BUTTON_COUNT 40
 
 #define BUTTON_IS_PRESSED(index) \
   ((gButtonIsPressed[(index)/8]) & (1 << ((index) % 8)))

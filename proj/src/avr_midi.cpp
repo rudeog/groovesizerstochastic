@@ -7,6 +7,18 @@
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial, midiA);
 
 
+//
+// PUBLIC
+//
+
+void
+midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel)
+{
+   // TODO add to Q so we can do note-off's
+   // chan here is 1 based
+   midiA.sendNoteOn(note, vel, chan);
+}
+
 // called from the main loop.
 // read midi port, issue callbacks
 void midiUpdate(void)

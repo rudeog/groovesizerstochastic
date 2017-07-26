@@ -33,6 +33,37 @@ void setup()
   // boot message - show version
   ledsShowNumber(VERSION_NUMBER);
   
+   // wait for user to press a button or move a pot.
+   // this allows us to seed our random number gen with something truly random
+   uint8_t seq=0, seed=0;
+   for(;;) {
+      uint8_t i;
+      for(i=0;i < BUTTON_COUNT;i++) {
+         if(BUTTON_JUST_PRESSED(i)) {
+            seq=i;
+            goto end;
+         }
+      }
+      
+      for(i=0;i<POT_COUNT;i++) {
+         if(POT_JUST_CHANGED(i)) {
+            seq=i;
+            goto end;
+         }
+      }
+      seed++;
+      buttonsUpdate();
+      potsUpdate();
+      ledsUpdate();
+   }
+   
+end:
+   // show the seed
+   ledsShowNumber(seed);
+   // seed the rng
+   rndSRandom( seed, seq);
+  
+  
 }
 
 //

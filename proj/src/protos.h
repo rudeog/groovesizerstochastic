@@ -8,13 +8,21 @@
 #ifndef _WIN32
 // AVR specific 
 #include <Arduino.h>
+#define LOGMESSAGE(...)
 #else
+#include <stdlib.h>
+#include <string.h>
 // Emulation specific
 typedef unsigned char   uint8_t;
 typedef char            int8_t;
 typedef unsigned short  uint16_t;
 typedef short           int16_t;
 typedef unsigned int    uint32_t;
+#define LOGMESSAGE(...) logMessage(__VA_ARGS__)
+void logMessage(int level, const char *format, ...);
+// emulate some arduino and other functions here
+uint32_t millis();
+
 #endif
 
 /////////////////////////
@@ -39,6 +47,8 @@ void midiSendClock(void);
 void midiSendStart(void);
 // send a midi STOP
 void midiSendStop(void);
+// send a note message (chan is 1 based)
+void midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel);
 
 /////////////////////////
 // BUTTONS
@@ -83,5 +93,14 @@ void seqClockTick(void);
 void seqSetBPM(uint8_t BPM);
 // user changes pattern
 void seqSetPattern(uint8_t pat);
+
+//////////////////////////
+// RANDOM
+
+// generate a random number between 0..max-1
+uint8_t rndRandom(uint8_t max);
+
+// seed random generator with a state and a sequence number
+void rndSRandom(uint8_t initstate, uint8_t initseq);
 
 #endif

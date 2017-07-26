@@ -1,4 +1,5 @@
 #include "main.h"
+// windows specific
 
 // use this to figure out size at compile time (currently 835)
 //char(*__kaboom)[sizeof(gSeqState)] = 1;
@@ -85,13 +86,7 @@ void midiSendClock()
 {
 
 }
-void playStep(int track, int position, int chan, int note, int vel)
-{
-   // todo random check, mute check, send midi note
-   logMessage(0, "[play] pat %1d tr %1d st %2d: ch %d note %d vel %d",
-      gRunningState.pattern + 1, track + 1, position + 1,
-      chan + 1, note, vel);
-}
+
 
 void advanceClock(int increment)
 {
@@ -249,8 +244,8 @@ void showState(bool track)
       xxCurrentTime / 1000,
       (int)gSeqState.tempo,
       gSeqState.swing,
-      (1000 * 60 / 24) / gSeqState.tempo,
-      (1000 * 60 / 4) / gSeqState.tempo,
+      gSeqState.tempo ? (1000 * 60 / 24) / gSeqState.tempo : 0,
+      gSeqState.tempo ? (1000 * 60 / 4) / gSeqState.tempo : 0,
       gRunningState.transportState == TRANSPORT_STARTED ? "started" : "stopped"
    );
    outputString("Regen every %d steps. MIDI channel %d\n", gSeqState.randomRegen, gSeqState.midiChannel);
@@ -335,6 +330,10 @@ void doSequencer()
    }
    seqSetup();
 
+   rndSRandom(42u, 51u);
+
+   seqSetBPM(120);
+
    for (;;) {
 
       statePattern = &gSeqState.patterns[gRunningState.pattern];
@@ -383,7 +382,7 @@ void doSequencer()
          if (params[0] > 255 || params[0] < 1)
             outputString("Invalid tempo (1-255)\n");
          else
-            gSeqState.tempo = params[0];
+            seqSetBPM(params[0]);
          break;
       case 5: // show everything
          showState(params[0] != 0);
@@ -404,7 +403,7 @@ void doSequencer()
             outputString("Invalid state [0 stop, 1 start]\n");
          break;
       case 8: // random
-         outputString("random number from 0 to %d inclusive is: %d\n", params[0] - 1, random(params[0]));
+         outputString("random number from 0 to %d inclusive is: %d\n", params[0] - 1, rndRandom(params[0]));
          break;
       case 9: // mute a track
          if (params[0] > 0 && params[0] < 7 && params[1] >= 0 && params[1] <= 1) {
@@ -539,3 +538,8 @@ int main(int argc, char *argv[])
    //while(doCommand());
 
 }
+
+void clockSetBPM(uint8_t) {}
+void midiSendStart(void) {}
+void midiSendStop(void) {}
+void midiPlayNote(uint8_t, uint8_t, uint8_t) {}

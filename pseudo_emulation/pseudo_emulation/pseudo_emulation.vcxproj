@@ -149,6 +149,7 @@
     <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\proj\src\random.cpp" />
     <ClCompile Include="..\..\proj\src\sequencer.cpp" />
     <ClCompile Include="buttons.cpp" />
     <ClCompile Include="main.cpp" />

@@ -5,247 +5,33 @@
 //
 // Globals
 //
+
+// these two are accessed externally as well
 SequencerState gSeqState;
 RunningState gRunningState;
+// used to cycle from 0..5 for clock ticks
+// to ensure that next clock tick starts at step boundary
+// when user just hit start
+static uint8_t gStepCounter;
 
-// set initial sequencer and running state
-void seqSetup(void)
-{
-  SeqStep *step;
-  SeqTrack *track;
-  // initial 0 state should be fine for most things
-  gSeqState.randomRegen = 1;
-  gSeqState.tempo=DEFAULT_BPM;
-
-  for(uint8_t i=0;i<NUM_PATTERNS;i++) {
-    for(uint8_t j=0;j<NUM_TRACKS;j++) {
-      track=&gSeqState.patterns[i].tracks[j];
-      track->numSteps=NUM_STEPS-1; // 0 based
-      track->midiNote=DEFAULT_MIDI_NOTE;
-    }    
-  }
-}
-
-// example
-#if 0
-void playStep()
-{
-  if (seqCurrentStep == 0 || seqCurrentStep == 16 || seqCurrentStep == seqFirstStep)
-  {
-    if (recall)
-    {
-      goLoad = true; // set a flag that we can now load a patch
-    }
-    //deal with the follow actions if we're on the first step
-    else if (seqCurrentStep == 0 && followAction != 0)
-    {
-      switch (followAction)
-      {
-      case 1: // play the next pattern      
-        if (checkToc(nowPlaying + 1) && saved == true) // check if there is a pattern stored in the next location
-        {
-          cued = nowPlaying + 1; // cue the next patch
-          goLoad = true;
-        }
-        break;
-      case 2:
-        if (saved == true) // we don't want to go over page breaks (30 is the second to last location on the page), and check if there is a pattern stored in the next location
-        {
-          cued = head; // cue the patch marked as the head
-          goLoad = true;
-        }
-        break;
-      }
-    }
-  }
-
-  if (!checkMute(seqCurrentStep)) // don't play anything if the step is muted on the master page
-  {
-    lastStep = seqCurrentStep; // used to blink the LED for the current step
-    for (byte i = 0; i < 12; i++) // for each of the tracks
-    {
-      if (fxFlam[i] == 1 && (seqCurrentStep % 2 == 0) && !checkStepFlam(i, seqCurrentStep))
-      {
-        if (!syncStarted)
-          scheduleFlam(i, track[i].accentLevel);
-        else
-          scheduleFlamSlave(i, track[i].accentLevel);
-      }
-      if (checkStepAccent(i, seqCurrentStep))
-      {
-        midiA.sendNoteOff(track[i].midiNoteNumber, track[i].accentLevel, track[i].midiChannel);
-        midiA.sendNoteOn(track[i].midiNoteNumber, track[i].accentLevel, track[i].midiChannel);
-        if (checkStepFlam(i, seqCurrentStep)) // schedule the first flam if this step is marked as flam
-        {
-          if (!syncStarted)
-            scheduleFlam(i, track[i].accentLevel);
-          else
-            scheduleFlamSlave(i, track[i].accentLevel);
-        }
-        else // if the this step is not marked as a flam, turn off any sceduled flams
-        track[i].nextFlamPulse = 0;
-      }
-      else if (checkStepOn(i, seqCurrentStep))
-      {
-        midiA.sendNoteOff(track[i].midiNoteNumber, track[i].level, track[i].midiChannel);
-        midiA.sendNoteOn(track[i].midiNoteNumber, track[i].level, track[i].midiChannel);
-        if (checkStepFlam(i, seqCurrentStep)) // schedule the first flam if this step is marked as flam
-        {
-          if (!syncStarted)
-            scheduleFlam(i, track[i].accentLevel);
-          else
-            scheduleFlamSlave(i, track[i].accentLevel);
-        }
-        else // if the this step is not marked as a flam, turn off any sceduled flams
-        track[i].nextFlamPulse = 0;
-      }
-    }
-  }
-
-  do 
-  {
-    if (seqNextStep >= 0)
-      seqCurrentStep = (((seqCurrentStep - seqFirstStep) + seqNextStep)%seqLength) + seqFirstStep; // advance the step counter
-    else // seqNextStep is negative
-    {
-      if ((seqCurrentStep + seqNextStep) < seqFirstStep || (seqCurrentStep + seqNextStep) > 32)
-        seqCurrentStep = seqLastStep + 1 + ((seqCurrentStep - seqFirstStep) + seqNextStep);
-      else
-        seqCurrentStep += seqNextStep;
-    }
-  }
-  while (checkSkip(seqCurrentStep)); // do it again if the step is marked as a skip
-}
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Forward decl
+static inline void patternChangeCheck();
+static inline void resetTracks();
+static void switchToPattern(uint8_t pattern);
+static inline uint8_t determineNextPattern();
+static inline void advancePosition(uint8_t tr);
+static inline void scheduleNext(void);
+static inline void processStep(uint8_t trNum, uint8_t pos);
+static inline void playNext(void);
 
 
 
 //
-//
-// NEW CODE !!!
-//
+// Public functions
 //
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////NATIVE (AVR) HERE////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// RANDOMNESS //
-// from pcg
-struct pcg_state_setseq_8 {
-   uint8_t state;
-   uint8_t inc;
-};
-
-typedef struct pcg_state_setseq_8       pcg8i_random_t;
-#define pcg8i_srandom_r                 pcg_setseq_8_srandom_r
-#define PCG_DEFAULT_MULTIPLIER_8        141U
-#define pcg8i_random_r                  pcg_setseq_8_rxs_m_xs_8_random_r
-#define pcg8i_boundedrand_r             pcg_setseq_8_rxs_m_xs_8_boundedrand_r
-
-inline uint8_t pcg_output_rxs_m_xs_8_8(uint8_t state)
-{
-   uint8_t word = ((state >> ((state >> 6u) + 2u)) ^ state) * 217u;
-   return (word >> 6u) ^ word;
-}
-inline void pcg_setseq_8_step_r(struct pcg_state_setseq_8* rng)
-{
-   rng->state = rng->state * PCG_DEFAULT_MULTIPLIER_8 + rng->inc;
-}
-
-inline uint8_t pcg_setseq_8_rxs_m_xs_8_random_r(struct pcg_state_setseq_8* rng)
-{
-   uint8_t oldstate = rng->state;
-   pcg_setseq_8_step_r(rng);
-   return pcg_output_rxs_m_xs_8_8(oldstate);
-}
-
-
-inline void pcg_setseq_8_srandom_r(struct pcg_state_setseq_8* rng,
-   uint8_t initstate, uint8_t initseq)
-{
-   rng->state = 0U;
-   rng->inc = (initseq << 1u) | 1u;
-   pcg_setseq_8_step_r(rng);
-   rng->state += initstate;
-   pcg_setseq_8_step_r(rng);
-}
-
-inline uint8_t
-pcg_setseq_8_rxs_m_xs_8_boundedrand_r(struct pcg_state_setseq_8* rng,
-   uint8_t bound)
-{
-   uint8_t threshold = ((uint8_t)(-bound)) % bound;
-   for (;;) {
-      uint8_t r = pcg_setseq_8_rxs_m_xs_8_random_r(rng);
-      if (r >= threshold)
-         return r % bound;
-      logMessage(1,"Random thoughts...");
-   }
-}
-
-// return 0..max-1
-uint8_t random(uint8_t max)
-{
-   static bool first = true;
-   static pcg8i_random_t rng;
-   if (first) {
-      first = false;
-      // TODO these need to be randomly seeded
-      pcg8i_srandom_r(&rng, 42u, 54u);
-   }
-   return pcg8i_boundedrand_r(&rng, max);
-}
-///////////////END RANDOM RAB//////////////////////////////////////////////////////////
-
- 
-//// From seq ////
-// anything starting with seq is extern
-static void resetTracks()
-{
-   // prepare tracks to be scheduled
-   memset(gRunningState.trackPositions, 0, NUM_TRACKS * sizeof(TrackRunningState));
-}
-
-// switch to a new pattern. this also 
-// resets each track on the new pattern to be ready for scheduling
-static void switchToPattern(uint8_t pattern)
-{
-   if (pattern == NUM_PATTERNS) // don't switch, just initialize
-      pattern = gRunningState.pattern;
-
-   logMessage(0,"[pattern switch] pattern %d", pattern + 1);
-   gRunningState.pattern = pattern;
-   gRunningState.patternCurrentCycle = 0;
-   gRunningState.patternHasPlayed = 0;
-   gRunningState.nextPattern = NUM_PATTERNS;
-   resetTracks();
-}
+// Initialize the sequencer
+// does not initialize tempo
 void seqSetup(void)
 {
    SeqTrack *track;
@@ -259,28 +45,42 @@ void seqSetup(void)
          track->midiNote = DEFAULT_MIDI_NOTE;
       }
    }
-
+      
    switchToPattern(0);
 }
 
-// invoke whenever user switches pattern
-void seqSetPattern(uint8_t pat)
-{
-   if (gRunningState.transportState == TRANSPORT_STARTED)
-      gRunningState.nextPattern = pat;
-   else // transport is stopped so do a full switch
-      switchToPattern(pat);
+// called from main loop to see if we need to alter sequencer state
+void
+seqCheckState(void)
+{ 
+   if (gRunningState.transportState == TRANSPORT_STARTED) {
+
+      // do we need to schedule any steps?
+      // we only do this when we've had a clock tick.
+      // more than that would be a waste of cpu
+      if (gRunningState.haveClockTick) {
+         scheduleNext();
+         gRunningState.haveClockTick = 0;
+      }
+
+      // do we need to play any scheduled steps?
+      // do this more frequently because of swing and div times that
+      // might require more granularity
+      playNext();
+
+      // do we need to change patterns?
+      // needs to be called after the above
+      patternChangeCheck();
+   }
 }
 
-// TODO should this be sitting here? used in 2 funcs below
-static uint8_t stepCounter;
-// ensure that next clock tick starts at step boundary
-// (user just hit start)
-void seqSetTransportState(uint8_t state)
+// Start or stop playback
+void
+seqSetTransportState(uint8_t state)
 {
    if (state == TRANSPORT_STARTED) {
       // this means that when you hit start, you could have a miniscule delay until next timer click
-      stepCounter = 0;
+      gStepCounter = 0;
       // initialize current pattern
       switchToPattern(NUM_PATTERNS);
    }
@@ -295,9 +95,7 @@ void seqSetTransportState(uint8_t state)
          break;        
       }
    }
-  
    gRunningState.transportState = state;
-
 }
 
 // this is called from midi handler as well
@@ -314,58 +112,52 @@ seqClockTick(void)
    gRunningState.haveClockTick = 1;
 
    // step occurs every 6 ticks (24/4 as there are 4 steps per beat)
-   if (stepCounter  == 0) {
+   if (gStepCounter  == 0) {
       gRunningState.lastStepTime = millis();
       gRunningState.lastStepTimeTriggered = 1;
    }
 
-   stepCounter++;
-   if (stepCounter > 5)
-      stepCounter = 0;
+   gStepCounter++;
+   if (gStepCounter > 5)
+      gStepCounter = 0;
 
 }
 
-
-// randomly determine which pattern will play next
-// returns NUM_PATTERNS if no switch will happen
-static uint8_t determineNextPattern()
+// change the BPM of the sequencer
+void
+seqSetBPM(uint8_t BPM)
 {
-   // value is 0..15 where 0 is never
-   uint8_t *probs = gSeqState.patterns[gRunningState.pattern].nextPatternProb;
-   uint8_t tot=0, rnd;
-   // add up all values
-   tot += (probs[0] & 0x0F); // pat 0
-   tot += (probs[0] >> 4);   // pat 1
-   tot += (probs[1] & 0x0F); // pat 2
-   tot += (probs[1] >> 4);   // pat 3
-
-   if (!tot) { // all are 0, don't switch
-      return NUM_PATTERNS;
-   }
-
-   // generate
-   rnd = random(tot);
-
-   // see where it lies
-   tot = 0;
-   tot += (probs[0] & 0x0F); // pat 0
-   if (rnd < tot) return 0;
-   tot += (probs[0] >> 4);   // pat 1
-   if (rnd < tot) return 1;
-   tot += (probs[1] & 0x0F); // pat 2
-   if (rnd < tot) return 2;
-   tot += (probs[1] >> 4);   // pat 3
-   if (rnd < tot) return 3;
-
-   outputString("Sprunt!\n"); // should never see this
-   exit(0);
-
-   return NUM_PATTERNS;
+   // note that we keep two different tempos. One is the set tempo, the other is possibly the
+   // actual calculated tempo if we are syncing
+  gSeqState.tempo=BPM;
+  
+  if(BPM==0) { // bpm of 0 indicates ext clock sync    
+    gRunningState.tempo=DEFAULT_BPM; // until we get clock sync we can't know what the tempo is        
+  } else {
+    gRunningState.tempo=BPM;    
+  }
+  
+  // let the clock do it's thing as well
+  clockSetBPM(BPM);  
 }
+
+// invoke whenever user switches pattern
+void seqSetPattern(uint8_t pat)
+{
+   if (gRunningState.transportState == TRANSPORT_STARTED)
+      gRunningState.nextPattern = pat;
+   else // transport is stopped so do a full switch
+      switchToPattern(pat);
+}
+
+//
+// Private
+//
 
 // check to see if we need to change to a new pattern.
 // if so, figure out what pattern we need
-void seqPatternChangeCheck()
+static inline void 
+patternChangeCheck()
 {
    uint8_t hasPlayed = gRunningState.patternHasPlayed;
    uint8_t switchTo = gRunningState.nextPattern; // will be NUM_PATTERNS if not active
@@ -402,9 +194,73 @@ void seqPatternChangeCheck()
       switchToPattern(switchTo);
 }
 
+// prepare tracks to be scheduled
+static inline void 
+resetTracks()
+{
+   memset(gRunningState.trackPositions, 0, NUM_TRACKS * sizeof(TrackRunningState));
+}
+
+// switch to a new pattern. this also 
+// resets each track on the new pattern to be ready for scheduling
+static void 
+switchToPattern(uint8_t pattern)
+{
+   if (pattern == NUM_PATTERNS) // don't switch, just initialize
+      pattern = gRunningState.pattern;
+
+   LOGMESSAGE(0,"[pattern switch] pattern %d", pattern + 1);
+   gRunningState.pattern = pattern;
+   gRunningState.patternCurrentCycle = 0;
+   gRunningState.patternHasPlayed = 0;
+   gRunningState.nextPattern = NUM_PATTERNS;
+   resetTracks();
+}
+
+// randomly determine which pattern will play next
+// returns NUM_PATTERNS if no switch will happen
+static inline uint8_t 
+determineNextPattern()
+{
+   // value is 0..15 where 0 is never
+   uint8_t *probs = gSeqState.patterns[gRunningState.pattern].nextPatternProb;
+   uint8_t tot=0, rnd;
+   // add up all values
+   tot += (probs[0] & 0x0F); // pat 0
+   tot += (probs[0] >> 4);   // pat 1
+   tot += (probs[1] & 0x0F); // pat 2
+   tot += (probs[1] >> 4);   // pat 3
+
+   if (!tot) { // all are 0, don't switch
+      return NUM_PATTERNS;
+   }
+
+   // generate
+   rnd = rndRandom(tot);
+
+   // see where it lies
+   tot = 0;
+   tot += (probs[0] & 0x0F); // pat 0
+   if (rnd < tot) return 0;
+   tot += (probs[0] >> 4);   // pat 1
+   if (rnd < tot) return 1;
+   tot += (probs[1] & 0x0F); // pat 2
+   if (rnd < tot) return 2;
+   tot += (probs[1] >> 4);   // pat 3
+   if (rnd < tot) return 3;
+
+   LOGMESSAGE(0,"Sprunt!"); // should never ever see this
+#ifdef _WIN32   
+   _exit(0);
+#endif
+
+   return NUM_PATTERNS;
+}
+
 // move track position to next
 // flagging "pattern has played" flag if need be
-static inline void advancePosition(uint8_t tr)
+static inline void 
+advancePosition(uint8_t tr)
 {
    TrackRunningState *trState = &gRunningState.trackPositions[tr];
    SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[tr];
@@ -464,7 +320,8 @@ static inline void advancePosition(uint8_t tr)
 
  
 // possibly schedule steps on all tracks to play
-void seqScheduleNext(void)
+static inline void
+scheduleNext(void)
 {
    // This means that we have an actual new step, and we need to
    // obey it. If we don't have this, we interpolate when clock
@@ -488,8 +345,8 @@ void seqScheduleNext(void)
             // do we need a new random? if so generate it for the track
             // todo make sure it's explicit that randomRegen is 1 based or fix this
             if (trState->position % gSeqState.randomRegen == 0) {
-               track->lastRandom = random(16);
-               logMessage(1,"Regenerate random for track %d ... %d", i, track->lastRandom);
+               track->lastRandom = rndRandom(16);
+               LOGMESSAGE(1,"Regenerate random for track %d ... %d", i, track->lastRandom);
             }
 
 
@@ -510,8 +367,9 @@ void seqScheduleNext(void)
                   // half a step's length in ms. there are 4 steps per beat
                   // HSL = 1000 / ((gSeqState.tempo / 60) * 8)
                   // then swing is a percentage, so HSL * swing / 100
-                  swing = (uint16_t)(1000 * 60 / 8 / 100) *gSeqState.swing / 
-                     gSeqState.tempo;                                       
+                  // this produced an (possibly invalid) overflow warning
+                  //swing = (uint16_t)(1000 * 60 / 8 / 100) *gSeqState.swing / gSeqState.tempo;                                       
+                  swing = (uint16_t)(75) * gSeqState.swing / gSeqState.tempo;                                       
                }
 
                //schedule it.
@@ -519,7 +377,7 @@ void seqScheduleNext(void)
                // these in the past which means they will play right away and we
                // will catch up (I think I observed this, but who knows if I'm missing something...)
                trState->nextScheduledStart = gRunningState.lastStepTime+swing;
-               logMessage(1, "Scheduled track %d for %d", i + 1, trState->nextScheduledStart);
+               LOGMESSAGE(1, "Scheduled track %d for %d", i + 1, trState->nextScheduledStart);
                trState->isScheduled = 1;
                trState->numCycle = 0; // allow interpolation again
             } // if !denomCycle
@@ -538,7 +396,7 @@ void seqScheduleNext(void)
                // that is multiplied with the cycle number we are on
                // to get the length of time from the last real step
                uint32_t periodLength =
-                  (uint32_t)(1000 * 60 / 4) * (track->clockDividerDenom + 1) 
+                  (uint32_t)(15000 /*1000 * 60 / 4*/) * (track->clockDividerDenom + 1) 
                      * trState->numCycle
                      / (gSeqState.tempo*(track->clockDividerNum + 1));
 
@@ -560,24 +418,34 @@ void seqScheduleNext(void)
 }
 
 
-static void processStep(uint8_t trNum, uint8_t pos)
+// Given a step, will determine whether it should play based on random
+// setting, and if so, play it
+static inline void
+processStep(uint8_t trNum, uint8_t pos)
 {
    SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[trNum];
    SeqStep *step= &track->steps[pos];
-   if (step->velocity) {
-      //lastRandom is a number 0..15
-      // prob of 0 doesn't mean never (effectively 1 based) 
+   if (step->velocity) { // 0 velocity means it's not on
+      // lastRandom is a number 0..15
+      // prob of 0 doesn't mean never (it's effectively 1 based) 
       if (step->probability + 1 > track->lastRandom) {
          uint8_t vel; 
-         // 1..15 translate to 1..127
+         // 1..15 translate to 1..127. 
          vel = 7 + (step->velocity * 8);
-         playStep(trNum, pos, gSeqState.midiChannel, track->midiNote, vel);
+         
+         LOGMESSAGE(0, "[play] pat %1d tr %1d st %2d: ch %d note %d vel %d",
+            gRunningState.pattern + 1, trNum + 1, pos + 1,
+            gSeqState.midiChannel + 1, track->midiNote, vel);
+         
+         // This expects 1 based midi channel
+         midiPlayNote(gSeqState.midiChannel + 1, track->midiNote, vel);         
       }
-
    }
 }
 
-void seqPlayNext(void)
+// check to see if any scheduled steps should be played, and if so play them
+static inline void
+playNext(void)
 {
    uint8_t chg=0;
    for (uint8_t i = 0; i<NUM_TRACKS; i++) {
@@ -598,45 +466,3 @@ void seqPlayNext(void)
    }
 }
 
-// called from main loop to see if we need to alter sequencer state
-void
-seqCheckState(void)
-{ 
-   if (gRunningState.transportState == TRANSPORT_STARTED) {
-
-      // do we need to schedule any steps?
-      // we only do this when we've had a clock tick.
-      // more than that would be a waste of cpu
-      if (gRunningState.haveClockTick) {
-         seqScheduleNext();
-         gRunningState.haveClockTick = 0;
-      }
-
-      // do we need to play any scheduled steps?
-      // do this more frequently because of swing and div times that
-      // might require more granularity
-      seqPlayNext();
-
-      // do we need to change patterns?
-      // needs to be called after the above
-      seqPatternChangeCheck();
-   }
-}
-
-// change the BPM of the sequencer
-void
-seqSetBPM(uint8_t BPM)
-{
-   // note that we keep two different tempos. One is the set tempo, the other is possibly the
-   // actual calculated tempo if we are syncing
-  gSeqState.tempo=BPM;
-  
-  if(BPM==0) { // bpm of 0 indicates ext clock sync    
-    gRunningState.tempo=DEFAULT_BPM; // until we get clock sync we can't know what the tempo is        
-  } else {
-    gRunningState.tempo=BPM;    
-  }
-  
-  // let the clock do it's thing as well
-  clockSetBPM(BPM);  
-}
