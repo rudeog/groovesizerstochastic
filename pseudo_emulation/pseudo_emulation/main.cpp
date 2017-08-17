@@ -123,7 +123,7 @@ Command cmds[] = {
    { "cl","<n> advance clock n milliseconds default one" }, //1
    { "div","<num> <denom> set divider num/denom" }, //2
    { "len","<len> set track len (pass 1 based)" }, //3
-   { "tempo","<n> set tempo to n" }, //4
+   { "tempo","<n> set tempo to n (range 50-255)" }, //4
    { "show", "<n> show everything. if n is there it shows track n info too" }, //5
    { "track", "<n> set track to <n> (pass 1 based)" }, //6
    { "play",  "<n> where n is 0=stop, 1=play" }, //7
@@ -132,14 +132,15 @@ Command cmds[] = {
    { "pat", "<n> <d> pattern switch to pattern n=1..4, d=delay switch (1=yes/0=no)" }, //10
    { "save", "<n> save all commands thusfar to file n" }, //11
    { "load", "<n> run commands from file n" }, //12
-   { "midi", "<n> set midi note 0..127 for current track" }, //13
+   { "midi", "<n> <chan> set midi note 0..127 and chan 1..16 for current track" }, //13
    { "step", "<stepnum> <vel> <prob> set vel (0..15), prob (1..16) vel 0=off" }, //14
    { "qstep","<n n n...> Turn steps on/off (0=off)" }, //15
    { "regen","<n> Regenerate random every n steps (1..32)" }, //16
-   { "swing","<n> set swing to n (0..100)" }, //17
+   { "swing","<n> set swing to n (0..99)" }, //17
    { "patprob","<n> <n> <n> <n> Switch probability (n: target pattern, 0-15, 0=never)" }, // 18
    { "patrep","<n> Times to repeat pattern (1..16)" }, // 19
    { "pathold","<n> If 1 will hold the pattern indefinitely" }, // 20   
+   { "loglevel", "<n> set log level (0=sparse 1=more, ...)"},  // 21
    { 0,0 }
 };
 
@@ -248,7 +249,7 @@ void showState(bool track)
       gSeqState.tempo ? (1000 * 60 / 4) / gSeqState.tempo : 0,
       gRunningState.transportState == TRANSPORT_STARTED ? "started" : "stopped"
    );
-   outputString("Regen every %d steps. MIDI channel %d\n", gSeqState.randomRegen, gSeqState.midiChannel);
+   outputString("Regen every %d steps.\n", gSeqState.randomRegen);
    if (gRunningState.nextPattern < NUM_PATTERNS) {
       outputString("Next pattern %d (%s)\n", gRunningState.nextPattern + 1,
          gSeqState.delayPatternSwitch ? "delay" : "immediate");
@@ -263,19 +264,21 @@ void showState(bool track)
 
 
    for (int i = 0; i < NUM_TRACKS; i++) {
-      outputString("Track %d: steps: %d divider(%d/%d) MIDI %d %s\n", i + 1,
-         gSeqState.patterns[gRunningState.pattern].tracks[i].numSteps + 1,
-         gSeqState.patterns[gRunningState.pattern].tracks[i].clockDividerNum + 1,
-         gSeqState.patterns[gRunningState.pattern].tracks[i].clockDividerDenom + 1,
-         gSeqState.patterns[gRunningState.pattern].tracks[i].midiNote,
-         gSeqState.patterns[gRunningState.pattern].tracks[i].muted ? "muted" : ""
+      outputString("Track %d: steps: %d divider(%d/%d) MIDI %d chan %d %s\n", i + 1,
+         gSeqState.tracks[i].numSteps + 1,
+         gSeqState.tracks[i].clockDividerNum + 1,
+         gSeqState.tracks[i].clockDividerDenom + 1,
+         gSeqState.tracks[i].midiNote,
+         gSeqState.tracks[i].midiChannel,
+         gSeqState.tracks[i].muted ? "muted" : ""
       );
    }
 
    if (track) {
       int i;
       outputString("CURRENT Track (%d) state (top row velocity bottom row prob)\n", gRunningState.currentTrack + 1);
-      SeqTrack *tr = &gSeqState.patterns[gRunningState.pattern].tracks[gRunningState.currentTrack];
+      SeqTrackStep *trs = &gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack];
+      SeqTrack *tr = &gSeqState.tracks[gRunningState.currentTrack];
       for (int cycle = 0; cycle < 2; cycle++) {
          int start = cycle * 16;
          int len = start + 16;
@@ -287,16 +290,16 @@ void showState(bool track)
          if (start<len)
             outputString("\n");
          for (i = start; i < len; i++) {
-            if (tr->steps[i].velocity)
-               outputString("%02d ", tr->steps[i].velocity);
+            if (trs->steps[i].velocity)
+               outputString("%02d ", trs->steps[i].velocity);
             else
                outputString("   ");
          }
          if (start<len)
             outputString("\n");
          for (i = start; i < len; i++) {
-            if (tr->steps[i].velocity)
-               outputString("%02d ", tr->steps[i].probability + 1);
+            if (trs->steps[i].velocity)
+               outputString("%02d ", trs->steps[i].probability + 1);
             else
                outputString("   ");
          }
@@ -316,6 +319,7 @@ void doSequencer()
 
    SeqPattern *statePattern;
    SeqTrack *stateTrack;
+   SeqTrackStep *stateTrackStep;
    TrackRunningState *runTrack;
    xxInputStream = stdin; // reading cmds from stdin
    xxLog = fopen(DEFAULT_LOG_FILE, "w");
@@ -337,8 +341,10 @@ void doSequencer()
    for (;;) {
 
       statePattern = &gSeqState.patterns[gRunningState.pattern];
-      stateTrack = &statePattern->tracks[gRunningState.currentTrack];
-      runTrack = &gRunningState.trackPositions[gRunningState.currentTrack];
+      stateTrack = &gSeqState.tracks[gRunningState.currentTrack];
+      stateTrackStep = &statePattern->trackSteps[gRunningState.currentTrack];
+      SeqTrack *tr = &gSeqState.tracks[gRunningState.currentTrack];
+      runTrack = &gRunningState.trackStates[gRunningState.currentTrack];
 
       outputString("%dms >", xxCurrentTime / 1000);
       c = getCommand(params, &pc);
@@ -359,7 +365,7 @@ void doSequencer()
          int num = params[0];
          int denom = params[1];
          // todo others are unsupported
-         if (num < 1 || num >4 || denom < 1 || denom >4 || denom == 3) {
+         if (num < 1 || num >4 || denom < 1 || denom >4 ) {
             outputString("unsupported clock divider\n");
          }
          else {
@@ -379,8 +385,8 @@ void doSequencer()
 
          break;
       case 4: // tempo
-         if (params[0] > 255 || params[0] < 1)
-            outputString("Invalid tempo (1-255)\n");
+         if (params[0] > 255 || params[0] < 50)
+            outputString("Invalid tempo (50-255)\n");
          else
             seqSetBPM(params[0]);
          break;
@@ -407,7 +413,7 @@ void doSequencer()
          break;
       case 9: // mute a track
          if (params[0] > 0 && params[0] < 7 && params[1] >= 0 && params[1] <= 1) {
-            gSeqState.patterns[gRunningState.pattern].tracks[params[0] - 1].muted =
+            gSeqState.tracks[params[0] - 1].muted =
                params[1];
             outputString("Track %d %s\n", params[0], params[1] ? "muted" : "unmuted");
          }
@@ -445,18 +451,19 @@ void doSequencer()
          break;
       }
       case 13: // set midi note for track
-         if (params[0] >= 0 && params[0] < 128)
+         if (params[0] >= 0 && params[0] < 128 && params[1] > 0 && params[1] < 17) {
             stateTrack->midiNote = params[0];
-         else
-            outputString("You dullard! Enter a proper range\n");
+            stateTrack->midiChannel = params[1];
+         } else
+            outputString("You dullard! Enter a proper range for both note and chan\n");
          break;
       case 14: // step vel prob 0..15 1..16
          if (params[0] >= 1 && params[0] <= NUM_STEPS &&
             params[1] >= 0 && params[1] < 16 &&
             params[2] >= 1 && params[2] <= 16) {
 
-            stateTrack->steps[params[0] - 1].velocity = params[1];
-            stateTrack->steps[params[0] - 1].probability = params[2] - 1;
+            stateTrackStep->steps[params[0] - 1].velocity = params[1];
+            stateTrackStep->steps[params[0] - 1].probability = params[2] - 1;
          }
          else {
             outputString("Out of range for one of those. Try again\n");
@@ -465,12 +472,12 @@ void doSequencer()
       case 15: // qstep
          for (int qstep_i = 0; qstep_i < pc && qstep_i < NUM_STEPS; qstep_i++) {
             if (params[qstep_i]) {
-               stateTrack->steps[qstep_i].velocity = 15;
-               stateTrack->steps[qstep_i].probability = 15;
+               stateTrackStep->steps[qstep_i].velocity = 15;
+               stateTrackStep->steps[qstep_i].probability = 15;
             }
             else {
-               stateTrack->steps[qstep_i].velocity = 0;
-               stateTrack->steps[qstep_i].probability = 0;
+               stateTrackStep->steps[qstep_i].velocity = 0;
+               stateTrackStep->steps[qstep_i].probability = 0;
             }
          }
          break;
@@ -481,10 +488,10 @@ void doSequencer()
             outputString("Range is 1..32\n");
          break;
       case 17: // swing
-         if (params[0] >= 0 && params[0] <= 100)
+         if (params[0] >= 0 && params[0] <= 99)
             gSeqState.swing = params[0];
          else
-            outputString("Range is 0..100\n");
+            outputString("Range is 0..99\n");
          break;
       case 18: // pattern probability 0..15
          for (int pp = 0; pp < 4; pp++) {
@@ -518,6 +525,9 @@ void doSequencer()
             gRunningState.patternHold = 1;
          else
             gRunningState.patternHold = 0;
+         break;
+      case 21: // loglevel
+         xxLogLevel = params[0];
          break;
 
       } // end case

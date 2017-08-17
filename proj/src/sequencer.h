@@ -33,37 +33,52 @@
 #endif
 //
 // DATA STATE
-// Represents user editable parameters that are saved with the sequence. Separate from current running state
+// Represents user editable parameters that are saved with the sequence. 
+// Separate from current running state
+// There are up to 32 steps per track
 //
 struct SeqStep {
   uint8_t velocity : 4; // 0=off 15=highest ( if<>0, add 1, multiply by 8 and subtract 1)
   uint8_t probability : 4;   // 0-15 where 15 is always
 };
 
-struct SeqTrack {
-   uint8_t numSteps : 5; // length of track 1-32 (add 1)
-   //supported: 1x, 2x, 4x, 1/4x, 1/2x, 3/4x 
-   uint8_t clockDividerNum : 2; // numerator for clock divider (0 based so 0=1)
-   uint8_t clockDividerDenom : 2; // denominator for clock divider (0 based)
-   uint8_t muted : 1;        // muted or not
-
-   uint8_t midiNote : 7; // which midi note it sends
+// each track has up to 32 steps
+struct SeqTrackStep {
    SeqStep steps[NUM_STEPS];
-   uint8_t lastRandom : 4; // 0..15 current random value for track
 };
 
+// There are 6 tracks.
+// This stores track data excluding the actual steps which are stored on the pattern
+struct SeqTrack {
+   uint8_t midiChannel :4;       // which midi channel we are sending on (0 based, add 1)
+   //supported clock divider values: anything where numerator and denominator are 1..4
+   uint8_t clockDividerNum : 2;     // numerator for clock divider (0 based so 0=1)
+   uint8_t clockDividerDenom : 2;   // denominator for clock divider (0 based)
+   uint8_t numSteps;                // length of track 1-32 (0 based, add 1)
+   
+   uint8_t muted : 1;        // muted or not
+   uint8_t midiNote : 7; // which midi note it sends   
+};
+
+// Store pattern data. Track information is not stored with the pattern.
+// This allows adjustments to track info to be present across all patterns
+// 4 patterns can exist.
 struct SeqPattern {
+   // 4 bits packed, for probability of which pattern plays next 
+   // value of 0 means never (current continues to play)
+   // range 0..15
+   uint8_t nextPatternProb[NUM_PATTERNS / 2]; 
+   SeqTrackStep trackSteps[NUM_TRACKS]; // actual step data
    uint8_t numCycles : 4; // (0 base..add 1) max 16 - number of times to play
-   uint8_t nextPatternProb[NUM_PATTERNS / 2]; // 4 bits packed, for probability of which pattern plays next value of 0 means never (current continues to play)
-   SeqTrack tracks[NUM_TRACKS];
 };
 
 // Data that can be saved/loaded (static during sequencer run operation)
 // we have 32k of eeprom so we can store a number of these
+// These could be packed, but there is only one instance so not critical now
 //
 struct SequencerState {
    SeqPattern patterns[NUM_PATTERNS]; // about 828 bytes
-   uint8_t midiChannel;        // which midi channel we are sending on (0 based)
+   SeqTrack tracks[NUM_TRACKS]; // track data excluding step information
    uint8_t tempo;              // 0=slave (respond to start/stop hopefully as well?)
    int8_t  swing;              // move back only 0..100 where 100 is on the next step
    int8_t  randomRegen;        // generate a new random number every n steps (1..32)
@@ -92,13 +107,16 @@ struct TrackRunningState {
    uint8_t numCycle : 3;       // incremented whenever we schedule a step when clockDiv is 4x, 2x or 3/4                               
    uint8_t denomCycle : 3;     // incremented whenever we get a clock step when clockDiv is 1/4, 1/2 or 3/4
    uint8_t isScheduled : 1;    // whether or not we have scheduled the next note (reset to 0 when it's been played)
+   uint8_t lastRandom : 4;     // 0..15 current random value for track   
    
    uint16_t nextScheduledStart;// when it's scheduled to play
+   uint16_t  lastDivStartTime;  // when the last time we started a div cycle (ie 1/4, 1/2 or 3/4 time cycle)
+
 };
 
 struct RunningState {
    uint8_t   tempo;      // current actual tempo (calculated or determined from seq state)
-   TrackRunningState  trackPositions[NUM_TRACKS]; // which position on each track we played last (only need 5 bits per)
+   TrackRunningState  trackStates[NUM_TRACKS]; // which position on each track we played last (only need 5 bits per)
 
     // which pattern we are playing and editing (could use 2 bits)
    uint8_t   pattern;
@@ -114,7 +132,6 @@ struct RunningState {
    // if true, hold the current pattern and don't increase patternCurrentCycle
    uint8_t   patternHold;
    uint16_t  lastStepTime;   // when the last whole step got triggered
-   uint16_t  lastDivStartTime;  // when the last time we started a div cycle (ie 1/4, 1/2 or 3/4 time cycle)
    uint8_t   lastStepTimeTriggered; // timer will set this, scheduler will clear it (bit)
    uint8_t haveClockTick; // (bit) will be set whenever we get a clock tick (midi or internal)
    uint8_t   patternHasPlayed;      // will be set to true whenever a whole pattern (ie track 1 of a pattern) has played

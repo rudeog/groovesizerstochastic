@@ -146,6 +146,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\proj\src\protos.h" />
+    <ClInclude Include="..\..\proj\src\sequencer.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>

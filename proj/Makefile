@@ -3,11 +3,12 @@
 # Requires either
 # * AVR compiler (avr-gcc et al) in path, or
 # * AVR_TOOLKIT_ROOT set to installation directory for example:
-#     AVR_TOOLKIT_ROOT = "E:\codez\arduino-1.8.2\hardware\tools\avr"
-#   Note that on windows, you need the quotes and the windows style path even in mingw
+#     export AVR_TOOLKIT_ROOT="/e/codez/arduino-1.8.2/hardware/tools/avr"
+#   NOTE that on windows, you MAY need the quotes and the windows style path (not sure when)
 #   This path is the root of which the ./bin directory contains avr-gcc
 #
 # if VERBOSE is defined, produce more output
+#   example: make fw VERBOSE=1
 
 ifdef VERBOSE
 ECHO := @true
@@ -19,17 +20,16 @@ AT :=@
 ECHO := @echo
 endif
 
-checkforgcc := $(shell which avr-gcc 1>/dev/null 2>/dev/null && echo "yes" || echo "no" ) #1> /dev/null 2>&1; echo $$?)
-ifneq ("$(strip $(checkforgcc))","yes")
-$(error AVR path is not set! Add the avr bin directory to the path or set AVR_TOOLKIT_ROOT )
-endif
-
-ifneq ("$(strip $(AVR_TOOLKIT_ROOT))","")
-BINPATH=$(AVR_TOOLKIT_ROOT)/bin/
-DUDECONF=$(AVR_TOOLKIT_ROOT)/etc/avrdude.conf
+ifeq ("$(strip $(AVR_TOOLKIT_ROOT))","")
+ checkforgcc := $(shell which avr-gcc 1>/dev/null 2>/dev/null && echo "yes" || echo "no" ) #1> /dev/null 2>&1; echo $$?)
+ ifneq ("$(strip $(checkforgcc))","yes")
+  $(error AVR path is not set! Add the avr bin directory to the path or set AVR_TOOLKIT_ROOT )
+ endif
+ BINPATH=""
+ DUDECONF=$(realpath $(dir $(shell which avrdude))/.. )/etc/avrdude.conf 
 else
-BINPATH=""
-DUDECONF=$(realpath $(dir $(shell which avrdude))/.. )/etc/avrdude.conf
+ BINPATH=$(AVR_TOOLKIT_ROOT)/bin/
+ DUDECONF=$(AVR_TOOLKIT_ROOT)/etc/avrdude.conf
 endif
 
 CC  =$(addprefix $(BINPATH),avr-gcc)

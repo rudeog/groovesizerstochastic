@@ -38,12 +38,10 @@ void seqSetup(void)
    // initial 0 state should be fine for most things
    gSeqState.randomRegen = 1;
    
-   for (uint8_t i = 0; i<NUM_PATTERNS; i++) {
-      for (uint8_t j = 0; j<NUM_TRACKS; j++) {
-         track = &gSeqState.patterns[i].tracks[j];
-         track->numSteps = DEFAULT_NUM_STEPS - 1; // 0 based
-         track->midiNote = DEFAULT_MIDI_NOTE;
-      }
+   for (uint8_t j = 0; j<NUM_TRACKS; j++) {
+      track = &gSeqState.tracks[j];
+      track->numSteps = DEFAULT_NUM_STEPS - 1; // 0 based
+      track->midiNote = DEFAULT_MIDI_NOTE;
    }
       
    switchToPattern(0);
@@ -198,7 +196,7 @@ patternChangeCheck()
 static inline void 
 resetTracks()
 {
-   memset(gRunningState.trackPositions, 0, NUM_TRACKS * sizeof(TrackRunningState));
+   memset(gRunningState.trackStates, 0, NUM_TRACKS * sizeof(TrackRunningState));
 }
 
 // switch to a new pattern. this also 
@@ -261,9 +259,9 @@ determineNextPattern()
 // flagging "pattern has played" flag if need be
 static inline void 
 advancePosition(uint8_t tr)
-{
-   TrackRunningState *trState = &gRunningState.trackPositions[tr];
-   SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[tr];
+{   
+   TrackRunningState *trState = &gRunningState.trackStates[tr];
+   SeqTrack *track = &gSeqState.tracks[tr];
 
    // if this was the last position, we need to check for pattern change
    // track 0 determines the length of a cycle
@@ -333,8 +331,8 @@ scheduleNext(void)
    
    // for each track check it
    for (uint8_t i = 0; i<NUM_TRACKS; i++) {
-      TrackRunningState *trState = &gRunningState.trackPositions[i];
-      SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[i];
+      TrackRunningState *trState = &gRunningState.trackStates[i];
+      SeqTrack *track = &gSeqState.tracks[i];
 
       
       // only be concerned with ones that are not already sched.
@@ -345,8 +343,8 @@ scheduleNext(void)
             // do we need a new random? if so generate it for the track
             // todo make sure it's explicit that randomRegen is 1 based or fix this
             if (trState->position % gSeqState.randomRegen == 0) {
-               track->lastRandom = rndRandom(16);
-               LOGMESSAGE(1,"Regenerate random for track %d ... %d", i, track->lastRandom);
+               trState->lastRandom = rndRandom(16);
+               LOGMESSAGE(1,"Regenerate random for track %d ... %d", i, trState->lastRandom);
             }
 
 
@@ -354,7 +352,7 @@ scheduleNext(void)
                uint16_t swing = 0;
                // squirrel this away so that we can calculate an offset from
                // this time for our 1/4, 1/2 and 3/4 divs
-               gRunningState.lastDivStartTime = gRunningState.lastStepTime;
+               trState->lastDivStartTime = gRunningState.lastStepTime;
 
                // apply swing only when no clock divider and on odd 16th notes
                // swing is a value of 1..100 where 100 would put it right on
@@ -362,14 +360,14 @@ scheduleNext(void)
                // note that you can't have negative swing!
                if (gSeqState.swing &&
                   (trState->position % 2 == 1) &&
-                  track->clockDividerNum == 1 &&
-                  track->clockDividerDenom == 1) {
-                  // half a step's length in ms. there are 4 steps per beat
-                  // HSL = 1000 / ((gSeqState.tempo / 60) * 8)
+                  track->clockDividerNum == 0 &&
+                  track->clockDividerDenom == 0) {
+                  // a step's length in ms. there are 4 steps per beat
+                  // SL = 1000 / ((gSeqState.tempo / 60) * 4)
                   // then swing is a percentage, so HSL * swing / 100
                   // this produced an (possibly invalid) overflow warning
-                  //swing = (uint16_t)(1000 * 60 / 8 / 100) *gSeqState.swing / gSeqState.tempo;                                       
-                  swing = (uint16_t)(75) * gSeqState.swing / gSeqState.tempo;                                       
+                  //swing = (uint16_t)(1000 * 60 / 4 / 100) *gSeqState.swing / gSeqState.tempo;                                       
+                  swing = (uint16_t)(150) * (uint16_t)gSeqState.swing / (uint16_t)gSeqState.tempo;                                       
                }
 
                //schedule it.
@@ -400,7 +398,7 @@ scheduleNext(void)
                      * trState->numCycle
                      / (gSeqState.tempo*(track->clockDividerNum + 1));
 
-               trState->nextScheduledStart = gRunningState.lastDivStartTime +
+               trState->nextScheduledStart = trState->lastDivStartTime +
                   (uint16_t)periodLength;
                trState->isScheduled = 1;               
             }
@@ -423,22 +421,22 @@ scheduleNext(void)
 static inline void
 processStep(uint8_t trNum, uint8_t pos)
 {
-   SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[trNum];
-   SeqStep *step= &track->steps[pos];
+   SeqTrack *track = &gSeqState.tracks[trNum];   
+   SeqStep *step= &gSeqState.patterns[gRunningState.pattern].trackSteps[trNum].steps[pos];
    if (step->velocity) { // 0 velocity means it's not on
       // lastRandom is a number 0..15
       // prob of 0 doesn't mean never (it's effectively 1 based) 
-      if (step->probability + 1 > track->lastRandom) {
+      if (step->probability + 1 > gRunningState.trackStates[trNum].lastRandom) {
          uint8_t vel; 
          // 1..15 translate to 1..127. 
          vel = 7 + (step->velocity * 8);
          
          LOGMESSAGE(0, "[play] pat %1d tr %1d st %2d: ch %d note %d vel %d",
             gRunningState.pattern + 1, trNum + 1, pos + 1,
-            gSeqState.midiChannel + 1, track->midiNote, vel);
+            track->midiChannel + 1, track->midiNote, vel);
          
          // This expects 1 based midi channel
-         midiPlayNote(gSeqState.midiChannel + 1, track->midiNote, vel);         
+         midiPlayNote(track->midiChannel + 1, track->midiNote, vel);         
       }
    }
 }
@@ -449,9 +447,9 @@ playNext(void)
 {
    uint8_t chg=0;
    for (uint8_t i = 0; i<NUM_TRACKS; i++) {
-      TrackRunningState *trState = &gRunningState.trackPositions[i];
-      SeqTrack *track = &gSeqState.patterns[gRunningState.pattern].tracks[i];
-
+      TrackRunningState *trState = &gRunningState.trackStates[i];
+      SeqTrack *track = &gSeqState.tracks[i];
+      
       // only concerned with ones that are not already sched.
       // on unmuted tracks
       if (trState->isScheduled &&

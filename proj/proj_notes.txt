@@ -5,67 +5,113 @@
   - check for initial assignment in functions of locals, some may not be needed
 
  U I
- We can be playing in any mode
- A pattern will be considered ended when the longest track has run it's course
+ We can be playing/stopping in any mode
+ A pattern will be considered ended when track 1 has run it's course
+
+ Parameters:
+ Global: (all settings managed thru pots)
+   Tempo (50-255)
+   Swing (0-99)   
+   Random Regen (gen new random number every n steps) (1-32)
+   delay pattern switch (y/n)
+   send midi clock (y/n)
+   send midi thru (y/n)
+ Pattern (per pattern): (managed thru R-shift action)
+   probabilities for next pattern to play (4 values) (0..15 where 0 is don't switch)
+   num cycles to repeat (1..16)
+ Track (per track, not pattern specific) (all except mute via pots)
+   channel
+   note num
+   muted
+   clock numer 1..4
+   clock denom 1..4
+   number of steps (1..32)
+ Step (each step in each track in each pattern) (L-shift and click step)
+   velocity
+   probability
+
+ Other needs:
+   switch tracks for editing track and steps on track (F buttons 1..6)
+   switch pattern (R Shift and F 1..4)
+   hold current pattern R shift and F6
+   on/off notes on track (on sets velo to highest, prob is unaffected)
+
+Here's how it goes down:
+
+There are 5 modes:
+- NO mode - default mode
+- POT edit mode - pot 1 or 5 is at a non-zero location
+- STEP EDIT MODE when l-shift and a step is selected
+- LEFT mode - when L shift is held. return to NO mode when it's released unless entering STEP EDIT MODE
+- RIGHT mode - when R shift is held. ends when it's released
+
+ Pot 1: Select editable track level parameter
+ Pot 2: edit that parameter
+ Pot 3: tempo (with shift held just displays tempo)
+ Pot 4: reserved
+ Pot 5: Select editable global parameter. all the way to the left is off
+ Pot 6: possibly edit that parameter  
  
- __Normal mode:
- -Neither L-shift nor R-shift are lit
+Note that if pot 1 and pot 5 are at non-zero, pot 1 overrides pot 5
+
  -buttons turn on and off notes
  -F-buttons switch between the 6 tracks
- -Pot 1 length in steps of current track
- -Pot 2 midi note for current track
- -Pot 3 clock divider for current track
  
- __Edit mode:
- -R-shift enters cell edit mode (r shift again exits it and returns to normal mode)
- -R-shift is lit
- -hitting a button lets you make that the current step for editing (flashes)
- -Pot 1 adjusts velocity of current step
- -Pot 2 adjusts probability of current step
- -F1-F6 will mute unmute tracks as shown with leds
- 
- __Pattern mode:
- Lights F1-F4 show the current pattern
- Light F5 indicates pattern hold (dont switch patterns)
- Light F6 if lit means delay switch till end of pattern
- -L-Shift enters pattern mode (and again exits it)
- -F1-F4 select current pattern which will switch right away or after current pattern is done depending on setting (if playing)
- -Pot 5 sets number of times to play pattern
- -Pot 1-4 set probability of next pattern and is shown as a scale on rows 1-4
- -F6 set whether to switch patterns immediately or after current pattern end (lit means delayed switch)
- -F5 pattern hold - holds the current pattern (toggle) so that it doesn't switch
- 
- __Global mode:
- -L-shift and R-shift enter global mode
- -Both L and R shift are lit
- -Pot 1 - midi channel
- -Pot 2 - tempo (0 to set ext clock)
- -Pot 3 - swing
- -Pot 5 - Random regen (how often to regenerate a random number -- every step, every n steps)
- -F1 plus another cell will save to that location
- -F2 plus another cell will load from that location
- -F3 toggle midi thru
- -F4 toggle midi send clock
- 
- __All modes:
- pot 6 is play/pause/stop - left is stop, right is play, middle is pause
+ L-shift plus button sets you in edit mode for that step (STEP EDIT MODE). L button stays flashing or lit
+   In this mode you can edit velocity and probability
+   L shift by itself or selecting a vel/prob by clicking a button takes you out of the mode
 
-S T O R A G E
-We will have:
-1 channel selection
-tempo selection 0=slave, 1-255=tempo
-swing
- *4 patterns
-number of times to play pattern (count) 4bit 1-16
-probability of next pattern to play 1-4 (After count above), 3 bits each where 0 is never, 7 highest
-6 tracks (each track can play one midi note)
- length selection for track (1-32 notes in track) 5 bits
- clock divider (3 bits) speed 4x 2x 1x 1/2x 1/4x
- midi note selection for track
- 32 steps:
-  velocity level (0=off, 15=highest) 4bits
-  probability (1 to 16) 4bits
-  
-  
+ L-shift plus track button mutes/unmutes
+
+ L-shift and pot 3 displays tempo
  
- 
+ R-shift plus F button 1..4 selects the pattern.
+ R-shift plus F6 toggles pattern hold
+
+
+ Holding R shift, bottom row of step buttons indicate 4 probability selections and cycle selection
+  pushing one of these buttons (R shift still held) selects that setting (prob 1..4, cycles)
+  for editing
+  Top two rows indicate level for selection, and can be pressed to select
+  all of this while R shift is held
+  
+
+ Clicking either L or R shift while holding the other toggles playback
+
+Indicators:
+NO mode:
+- When playing, current step will flash
+- F light will indicate current track
+- lights for ON steps will be lit
+
+LEFT mode:
+- total number of steps in track will light
+- unmuted tracks (F lights) will be lit
+
+RIGHT mode:
+- F light 1..4 will light with current pattern
+- F6 will be lit if pattern hold is in effect
+- Bottom row left 5 lights are lit and one is blinking (depending on whether editing pat prob 1..4 or num cycles)
+- top two rows indicate as a bar graph the value of current pat prob or num cycles
+
+STEP EDIT mode
+- Edited step is flashing
+- Top two rows indicate velocity as a bar graph
+- Bottom two rows indicate probability as a bar graph
+- L shift is lit
+
+POT mode
+- depends on what is selected for editing. Each of these has a reserved light which blinks (use labels on the box):
+   Top right green light is for indicating yes/no settings with blink=no, solid=yes
+   global Swing (0-99) numeric display
+   global Random Regen (gen new random number every n steps) (1-32) numeric display
+   global delay pattern switch (y/n)
+   global send midi clock (y/n)
+   global send midi thru (y/n)   
+   track channel - numeric display
+   track note num - numeric display
+   track clock numer 1..4 numeric display
+   track clock denom 1..4 numeric display
+   track number of steps (1..32) numeric display
+
+

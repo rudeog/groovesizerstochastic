@@ -1,1 +1,20 @@
-<NotepadPlus />
+<NotepadPlus>
+    <Project name="stocha">
+        <File name="avr_buttons.cpp" />
+        <File name="avr_clock.cpp" />
+        <File name="avr_eeprom.cpp" />
+        <File name="avr_leds.cpp" />
+        <File name="avr_main.cpp" />
+        <File name="avr_main.h" />
+        <File name="avr_midi.cpp" />
+        <File name="avr_pots.cpp" />
+        <File name="avr_structs.h" />
+        <File name="avr_ui.cpp" />
+        <File name="npp_workspace" />
+        <File name="protos.h" />
+        <File name="random.cpp" />
+        <File name="sequencer.cpp" />
+        <File name="sequencer.h" />
+        <File name="E:\codez\src\groovesizerstochastic\proj\Makefile" />
+    </Project>
+</NotepadPlus>
