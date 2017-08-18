@@ -39,9 +39,9 @@
 Here's how it goes down:
 
 There are 5 modes:
-- NO mode - default mode
-- POT edit mode - pot 1 or 5 is at a non-zero location
-- STEP EDIT MODE when l-shift and a step is selected
+- NONE mode - default mode
+- POTEDIT mode - pot 1 or 5 is at a non-zero location
+- STEPEDIT modewhen l-shift and a step is selected
 - LEFT mode - when L shift is held. return to NO mode when it's released unless entering STEP EDIT MODE
 - RIGHT mode - when R shift is held. ends when it's released
 

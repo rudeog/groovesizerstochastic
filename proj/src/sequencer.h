@@ -114,6 +114,38 @@ struct TrackRunningState {
 
 };
 
+#define SEQ_MODE_NONE     0 // default mode
+#define SEQ_MODE_POTEDIT  1 // pot 1 or 5 is at a non-zero location. submode is which option is selected
+#define SEQ_MODE_STEPEDIT 2 // when l-shift and a step is selected. submode is which step is selected
+#define SEQ_MODE_LEFT     3 // when L shift is held
+#define SEQ_MODE_RIGHT    4 // when R shift is held
+
+// sub-modes for pot edit mode
+
+// These are options available thru global edit via pot 5
+#define SEQ_GLBL_OFF       0 // not selected
+#define SEQ_GLBL_SWING     1 // edit swing
+#define SEQ_GLBL_RANDREGEN 2 // edit random regen (gen new random number every n steps) (1-32)
+#define SEQ_GLBL_DELAYPAT  3 // delay pattern switch (y/n)
+#define SEQ_GLBL_SENDCLK   4 // send midi clock (y/n)
+#define SEQ_GLBL_SENDTHRU  5 // send midi thru (y/n)
+#define SEQ_GLBL_TOTAL     6 // total number of global settings
+
+// These are options available thru track edit via pot 1
+#define SEQ_TRED_OFF       0 // not selected
+#define SEQ_TRED_CHANNEL   1 // 0 based midi channel
+#define SEQ_TRED_NOTENUM   2 // midi note
+#define SEQ_TRED_MUTED     3 // muted (y/n)
+#define SEQ_TRED_NUMERATOR 4 // 1..4 (0 based)
+#define SEQ_TRED_DENOM     5 // 1..4 (0 based)
+#define SEQ_TRED_STEPCOUNT 6 // 1..32 (0 based)
+#define SEQ_TRED_TOTAL     7 // total number of track settings
+
+// this bit combined with the above is stored in currentSubMode
+// If it's set we are editing global, otherwise track
+#define SEQ_GLBL_OR_TRED_SELECTOR 0x80
+
+
 struct RunningState {
    uint8_t   tempo;      // current actual tempo (calculated or determined from seq state)
    TrackRunningState  trackStates[NUM_TRACKS]; // which position on each track we played last (only need 5 bits per)
@@ -139,6 +171,7 @@ struct RunningState {
 
    // UI
    uint8_t   currentMode;    // which mode we are in
+   uint8_t   currentSubMode; // multi-purpose. depends on current mode
    uint8_t   currentTrack;   // which track is currently displayed
    uint8_t   currentStep;    // which step is being edited
 

@@ -730,9 +730,147 @@ void userControl()
 #endif
 
 
-void uiAcceptInput(void)
+static 
+void modeCheck(void)
 {
-  // TODO main ui loop
+   switch(gRunningState.currentMode) {
+   case SEQ_MODE_NONE: // can switch to any mode except stepedit
+      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL) > SEQ_TRED_OFF || 
+         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL) > SEQ_GLBL_OFF) {
+         // switch to POTEDIT mode
+         gRunningState.currentMode=SEQ_MODE_POTEDIT;
+      } else if(BUTTON_IS_PRESSED(BUTTON_L_SHIFT)) {
+         gRunningState.currentMode=SEQ_MODE_LEFT;
+      } else if(BUTTON_IS_PRESSED(BUTTON_R_SHIFT)) {
+         gRunningState.currentMode=SEQ_MODE_RIGHT;
+      }
+      break;
+   case SEQ_MODE_POTEDIT: // can shift to none when both pots are at 0
+      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL) == SEQ_TRED_OFF &&
+         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL) == SEQ_GLBL_OFF) {
+         gRunningState.currentMode=SEQ_MODE_NONE;
+      }   
+      break;
+   case SEQ_MODE_STEPEDIT: // can shift to none when either l-shift is JUST pressed or any green button
+      // todo check this
+      break;
+   case SEQ_MODE_LEFT: // can shift to none when released
+      if(!BUTTON_IS_PRESSED(BUTTON_L_SHIFT)) {
+         gRunningState.currentMode=SEQ_MODE_NONE;
+      }
+      break;
+   case SEQ_MODE_RIGHT: // can shift to none when released
+      if(!BUTTON_IS_PRESSED(BUTTON_R_SHIFT)) {
+         gRunningState.currentMode=SEQ_MODE_NONE;
+      }
+      break;   
+   }
+}
+
+// handles mode NONE. When we are not in a specific mode
+// need to respond to buttons which turn on and off notes
+// and also respond to F buttons which switch tracks
+static void 
+uiHandleMainMode()
+{
+   uint8_t i, len;
+   
+   len=gSeqState.tracks[gRunningState.currentTrack].numSteps;
+   SeqStep *steps=gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack].steps;
+   
+   // check to see if any of the step buttons were just pressed and  toggle them
+   for(i=0;i<len;i++) {
+      if (BUTTON_JUST_PRESSED(i)) {
+         if (!steps[i].velocity) {// currently off
+            steps[i].velocity = 15;
+            steps[i].probability = 15;
+         }
+         else // turn off
+            steps[i].velocity = 0;      
+      }
+   }
+
+   // check to see if any F buttons were just pressed and switch pattern
+   for (i = BUTTON_FUNCTION; i < BUTTON_FUNCTION + 8; i++) {
+      if (BUTTON_JUST_PRESSED(i)) {
+         // if the track is not current, switch to it
+         gRunningState.currentTrack = i;
+      }
+   }
+   
+}
+
+// if in pot mode, we will respond to pot 1, 2, 5 and 6
+// if 1 or 5 are set to non-zero, we set a new submode
+// if 2 or 6 is moved, we check submode and alter setting based on it
+// some of the modes are y/n which means that a button press toggles it
+static void
+uiHandlePotMode(void)
+{
+   uint8_t pv;
+   uint8_t global = 0;
+
+   // set the correct sub-mode based on pots 1 and 5
+
+   // see if we are in global edit
+   pv = POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL);
+   if (pv == SEQ_GLBL_OFF) {
+      // see if we are in track edit
+      pv = POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL);      
+   }
+   else       
+      global = 1;
+      
+   if (!pv)
+      return; // this shouldn't happen - when both are 0
+
+   // set this up so that led's can check it, etc
+   gRunningState.currentSubMode = pv;
+   if(global)
+      gRunningState.currentSubMode |= SEQ_GLBL_OR_TRED_SELECTOR;
+
+
+   if (!global && POT_JUST_CHANGED(POT_2)) { 
+      // if one of the track edit modes is set apply it
+
+   }
+   else if (global && POT_JUST_CHANGED(POT_6)) { 
+      // if one of the global edit modes, apply it
+
+   }
+   else if (BUTTON_JUST_PRESSED(BUTTON_TOGGLE_SETTING)) {
+      // if in a mode that has a toggle setting, toggle it
+      switch (pv) {
+
+      }
+   }
+
+}
+
+void
+uiAcceptInput(void)
+{
+   // mode state machine. see if we need to shift modes
+   modeCheck();
+   
+   // handle current mode
+   switch(gRunningState.currentMode) {
+   case SEQ_MODE_NONE:
+      uiHandleMainMode();
+      break;
+   case SEQ_MODE_POTEDIT:
+      uiHandlePotMode();
+      break;
+   case SEQ_MODE_STEPEDIT:
+      break;
+   case SEQ_MODE_LEFT:
+      break;
+   case SEQ_MODE_RIGHT:
+      break;   
+   }
+   
+   
+  
 }
 
 
