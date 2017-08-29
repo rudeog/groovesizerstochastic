@@ -110,7 +110,6 @@ void HandleStop (void)
   }  
 }
 
-// TODO where do we call this from?
 void midiSetThru(void)
 {
   if(gSeqState.midiThru) {

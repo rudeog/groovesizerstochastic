@@ -49,6 +49,8 @@ void midiSendStart(void);
 void midiSendStop(void);
 // send a note message (chan is 1 based)
 void midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel);
+// Set midi thru on/off depending on the state
+void midiSetThru(void);
 
 /////////////////////////
 // BUTTONS

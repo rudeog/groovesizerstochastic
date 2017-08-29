@@ -41,42 +41,51 @@ Here's how it goes down:
 There are 5 modes:
 - NONE mode - default mode
 - POTEDIT mode - pot 1 or 5 is at a non-zero location
-- STEPEDIT modewhen l-shift and a step is selected
-- LEFT mode - when L shift is held. return to NO mode when it's released unless entering STEP EDIT MODE
+- STEPEDIT mode - when l-shift and a step was pressed
+- LEFT mode - when L shift is being held. return to NO mode when it's released unless entering STEPEDIT mode
 - RIGHT mode - when R shift is held. ends when it's released
 
- Pot 1: Select editable track level parameter
- Pot 2: edit that parameter
+ Pot 1: Select editable track level parameter (all the way to left is off)
+ Pot 2: edit parameter selected by pot 1
  Pot 3: tempo (with shift held just displays tempo)
  Pot 4: reserved
  Pot 5: Select editable global parameter. all the way to the left is off
- Pot 6: possibly edit that parameter  
+ Pot 6: Edit the global parameters selected by pot 5
  
 Note that if pot 1 and pot 5 are at non-zero, pot 1 overrides pot 5
 
- -buttons turn on and off notes
- -F-buttons switch between the 6 tracks
+
+Regular buttons: 
+  in NONE mode - turn on and off notes
+  in LEFT mode - set stepedit mode for that button
+  in RIGHT mode - bottom row can select pattern change and cycle actions
+  
+F-buttons:
+  switch between the 6 tracks in NONE mode
+  in LEFT mode, mute/unmute track
+  in RIGHT mode, select pattern or for F6 turn on/off pattern hold
  
- L-shift plus button sets you in edit mode for that step (STEP EDIT MODE). L button stays flashing or lit
+L-shift plus button sets you in edit mode for that step (STEP EDIT MODE). L button stays flashing or lit
    In this mode you can edit velocity and probability
-   L shift by itself or selecting a vel/prob by clicking a button takes you out of the mode
+   L shift by itself takes you out of the mode
 
- L-shift plus track button mutes/unmutes
+L-shift plus track button mutes/unmutes
 
- L-shift and pot 3 displays tempo
+L-shift and pot 3 displays current tempo without modifying it
  
- R-shift plus F button 1..4 selects the pattern.
- R-shift plus F6 toggles pattern hold
+R-shift plus F button 1..4 selects the pattern.
+R-shift plus F6 toggles pattern hold
 
 
- Holding R shift, bottom row of step buttons indicate 4 probability selections and cycle selection
+In RIGHT mode, bottom row of step buttons indicate 4 probability selections and cycle selection
   pushing one of these buttons (R shift still held) selects that setting (prob 1..4, cycles)
-  for editing
+  for editing 
   Top two rows indicate level for selection, and can be pressed to select
   all of this while R shift is held
+  When R shift is released, back to NONE mode
   
 
- Clicking either L or R shift while holding the other toggles playback
+Clicking either L or R shift while holding the other toggles playback
 
 Indicators:
 NO mode:

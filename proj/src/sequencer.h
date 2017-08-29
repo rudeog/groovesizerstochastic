@@ -114,13 +114,15 @@ struct TrackRunningState {
 
 };
 
-#define SEQ_MODE_NONE     0 // default mode
-#define SEQ_MODE_POTEDIT  1 // pot 1 or 5 is at a non-zero location. submode is which option is selected
-#define SEQ_MODE_STEPEDIT 2 // when l-shift and a step is selected. submode is which step is selected
-#define SEQ_MODE_LEFT     3 // when L shift is held
-#define SEQ_MODE_RIGHT    4 // when R shift is held
+// we have a main mode, and a submode. the submode differs depending on the main mode
 
-// sub-modes for pot edit mode
+#define SEQ_MODE_NONE     0 // default mode
+#define SEQ_MODE_POTEDIT  1 // pot 1 or 5 is at a non-zero location.   SUBMODE: which option is selected
+#define SEQ_MODE_STEPEDIT 2 // when l-shift and a step is selected.    SUBMODE: which step is selected
+#define SEQ_MODE_LEFT     3 // when L shift is held
+#define SEQ_MODE_RIGHT    4 // when R shift is held                    SUBMODE: which pattern/cycle button is selected
+
+// sub-modes for pot edit mode:
 
 // These are options available thru global edit via pot 5
 #define SEQ_GLBL_OFF       0 // not selected
@@ -142,7 +144,7 @@ struct TrackRunningState {
 #define SEQ_TRED_TOTAL     7 // total number of track settings
 
 // this bit combined with the above is stored in currentSubMode
-// If it's set we are editing global, otherwise track
+// If it's set we are editing global setting, otherwise a track setting
 #define SEQ_GLBL_OR_TRED_SELECTOR 0x80
 
 

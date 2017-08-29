@@ -729,10 +729,12 @@ void userControl()
 }
 #endif
 
-
+/* This handles switching between modes
+ */
 static 
 void modeCheck(void)
 {
+   uint8_t i;
    switch(gRunningState.currentMode) {
    case SEQ_MODE_NONE: // can switch to any mode except stepedit
       if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL) > SEQ_TRED_OFF || 
@@ -751,12 +753,25 @@ void modeCheck(void)
          gRunningState.currentMode=SEQ_MODE_NONE;
       }   
       break;
-   case SEQ_MODE_STEPEDIT: // can shift to none when either l-shift is JUST pressed or any green button
-      // todo check this
+   case SEQ_MODE_STEPEDIT: // can shift to none when l-shift is JUST pressed
+      if(BUTTON_JUST_PRESSED(BUTTON_L_SHIFT)) 
+         gRunningState.currentMode=SEQ_MODE_NONE;
+      
       break;
-   case SEQ_MODE_LEFT: // can shift to none when released
+   case SEQ_MODE_LEFT: 
+      // can shift to none when released
       if(!BUTTON_IS_PRESSED(BUTTON_L_SHIFT)) {
          gRunningState.currentMode=SEQ_MODE_NONE;
+      } else {
+         // can shift to stepedit when a green button is pressed
+         for(i=0;i<BUTTON_L_SHIFT;i++) { // for all green buttons
+            if(BUTTON_JUST_PRESSED(i)) {
+               // set submode to the step being edited
+               gRunningState.currentSubMode=i;
+               gRunningState.currentMode=SEQ_MODE_STEPEDIT;
+               break;
+            }
+         }         
       }
       break;
    case SEQ_MODE_RIGHT: // can shift to none when released
@@ -767,9 +782,10 @@ void modeCheck(void)
    }
 }
 
-// handles mode NONE. When we are not in a specific mode
-// need to respond to buttons which turn on and off notes
-// and also respond to F buttons which switch tracks
+/* handles mode NONE. When we are not in a specific mode
+ * need to respond to buttons which turn on and off notes
+ * and also respond to F buttons which switch tracks
+ */
 static void 
 uiHandleMainMode()
 {
@@ -791,7 +807,7 @@ uiHandleMainMode()
    }
 
    // check to see if any F buttons were just pressed and switch pattern
-   for (i = BUTTON_FUNCTION; i < BUTTON_FUNCTION + 8; i++) {
+   for (i = BUTTON_FUNCTION; i < BUTTON_FUNCTION + BUTTON_NUM_FUNCTION; i++) {
       if (BUTTON_JUST_PRESSED(i)) {
          // if the track is not current, switch to it
          gRunningState.currentTrack = i;
@@ -800,15 +816,17 @@ uiHandleMainMode()
    
 }
 
-// if in pot mode, we will respond to pot 1, 2, 5 and 6
-// if 1 or 5 are set to non-zero, we set a new submode
-// if 2 or 6 is moved, we check submode and alter setting based on it
-// some of the modes are y/n which means that a button press toggles it
+/* if in pot mode, we will respond to pot 1, 2, 5 and 6
+ * if 1 or 5 are set to non-zero, we set a new submode
+ * if 2 or 6 is moved, we check submode and alter setting based on it
+ * some of the modes are y/n which means that a button press toggles it
+ */
 static void
 uiHandlePotMode(void)
 {
    uint8_t pv;
    uint8_t global = 0;
+   SeqTrack *track = &gSeqState.tracks[gRunningState.currentTrack];
 
    // set the correct sub-mode based on pots 1 and 5
 
@@ -822,31 +840,147 @@ uiHandlePotMode(void)
       global = 1;
       
    if (!pv)
-      return; // this shouldn't happen - when both are 0
+      return; // this shouldn't happen (see modeCheck) - when both are 0
 
-   // set this up so that led's can check it, etc
+   // The submode is set to whichever setting is being edited
    gRunningState.currentSubMode = pv;
-   if(global)
+   if(global) // signify that we are editing a global setting
       gRunningState.currentSubMode |= SEQ_GLBL_OR_TRED_SELECTOR;
 
-
    if (!global && POT_JUST_CHANGED(POT_2)) { 
-      // if one of the track edit modes is set apply it
-
-   }
-   else if (global && POT_JUST_CHANGED(POT_6)) { 
+      // if one of the track edit modes is set apply it's new setting to the track      
+      switch(pv) {
+      case SEQ_TRED_CHANNEL: // 0 based midi channel
+         track->midiChannel=POT_MAP(POT_2, 0, 15);
+         break;
+      case SEQ_TRED_NOTENUM: // midi note
+         track->midiNote=POT_MAP(POT_2,0,127);
+         break;
+      case SEQ_TRED_MUTED:   // muted (y/n)
+         track->muted=POT_MAP(POT_2,0,1);
+         break;
+      case SEQ_TRED_NUMERATOR: // 1..4 (0 based)
+         track->clockDividerNum = POT_MAP(POT_2,0,3);
+         break;
+      case SEQ_TRED_DENOM: // 1..4 (0 based)
+         track->clockDividerDenom = POT_MAP(POT_2,0,3);
+         break;
+      case SEQ_TRED_STEPCOUNT: // 1..32 (0 based)
+         track->numSteps = POT_MAP(POT_2,0,31);
+         break;
+      default:
+         break;
+      }
+   }   
+   else if (global && POT_JUST_CHANGED(POT_6)) { // editing global
       // if one of the global edit modes, apply it
-
+      switch(pv) {
+      case SEQ_GLBL_SWING:    // edit swing
+         gSeqState.swing = POT_MAP(POT_6,0,100);
+         break;
+      case SEQ_GLBL_RANDREGEN:// edit random regen (gen new random number every n steps) (1-32)
+         gSeqState.randomRegen = POT_MAP(POT_6,1,32);
+         break;
+      case SEQ_GLBL_DELAYPAT: // delay pattern switch (y/n)
+         gSeqState.delayPatternSwitch = POT_MAP(POT_6,0,1);
+         break;
+      case SEQ_GLBL_SENDCLK:  // send midi clock (y/n)
+         gSeqState.midiSendClock = POT_MAP(POT_6,0,1);
+         break;
+      case SEQ_GLBL_SENDTHRU: // send midi thru (y/n)
+      {
+         uint8_t t = POT_MAP(POT_6,0,1);
+         if(gSeqState.midiThru != t) {
+            gSeqState.midiThru = t;
+            midiSetThru(); // TODO we also need to update this when loading from eeprom
+         }
+         break;
+      }
+      default:
+         break;
+      }      
    }
    else if (BUTTON_JUST_PRESSED(BUTTON_TOGGLE_SETTING)) {
       // if in a mode that has a toggle setting, toggle it
-      switch (pv) {
-
+      if(!global) {
+         if(pv==SEQ_TRED_MUTED)   // muted (y/n)
+            track->muted=!track->muted;         
+      } else {
+         switch(pv) {
+         case SEQ_GLBL_DELAYPAT: // delay pattern switch (y/n)
+            gSeqState.delayPatternSwitch = !gSeqState.delayPatternSwitch;
+            break;
+         case SEQ_GLBL_SENDCLK:  // send midi clock (y/n)
+            gSeqState.midiSendClock = !gSeqState.midiSendClock;
+            break;
+         case SEQ_GLBL_SENDTHRU: // send midi thru (y/n)
+            gSeqState.midiThru = !gSeqState.midiThru;      
+            midiSetThru(); // TODO we also need to update this when loading from eeprom
+            break;
+         default:
+            break;
+         }      
       }
    }
-
 }
 
+/* In step edit mode, we have selected a step for editing, so our submode indicates
+ * which step was selected for editing. 
+ * We will respond to buttons on the top two rows to set velocity (where the first button sets it to 0)
+ * Bottom two rows will set probability, where the first button sets it to least-likely
+ */
+static void
+uiHandleStepEdit()
+{
+   // TODO
+}
+
+/* In this mode we can toggle mute a track, also exercising pot 3 shows current tempo without changing it
+ * Also, if R shift is pressed we toggle playback
+*/
+static void
+uiHandleLeftMode()
+{
+   uint8_t i;
+   SeqTrack *track;
+   for (i = BUTTON_FUNCTION; i < BUTTON_FUNCTION + BUTTON_NUM_FUNCTION; i++) {
+      if (BUTTON_JUST_PRESSED(i)) {
+          track = &gSeqState.tracks[i-BUTTON_FUNCTION];
+         // mute/unmute
+         track->muted=!track->muted;
+         break;
+      }
+   }
+   
+   // handle tempo display
+   if(POT_JUST_CHANGED(POT_3)) {      
+      ledsShowNumber(gSeqState.tempo);
+   }
+   
+   // TODO check r-shift and toggle playback
+   
+}
+
+/* TODO:
+R-shift plus F button 1..4 selects the pattern.
+R-shift plus F6 toggles pattern hold
+
+
+In RIGHT mode, bottom row of step buttons indicate 4 probability selections and cycle selection
+  pushing one of these buttons (R shift still held) selects that setting (prob 1..4, cycles)
+  for editing 
+  Top two rows indicate level for selection, and can be pressed to select
+  all of this while R shift is held  
+  
+*/
+static void
+uiHandleRightMode()
+{
+   // TODO
+}
+
+/* Main dispatcher for user interaction. Try to keep things modularized and single purpose here
+*/
 void
 uiAcceptInput(void)
 {
@@ -862,15 +996,15 @@ uiAcceptInput(void)
       uiHandlePotMode();
       break;
    case SEQ_MODE_STEPEDIT:
+      uiHandleStepEdit();
       break;
    case SEQ_MODE_LEFT:
+      uiHandleLeftMode();
       break;
    case SEQ_MODE_RIGHT:
+      uiHandleRightMode();
       break;   
    }
-   
-   
-  
 }
 
 
