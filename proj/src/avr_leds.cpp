@@ -1,13 +1,16 @@
 #include "avr_main.h"
-// for the rows of LEDs
-// the byte that will be shifted out 
 
 // time in ms to display temporary values (like if a pot is twiddled)
 #define LED_TEMP_DISPLAY_TIME 1000
 // time in milliseconds between state flip
 #define LED_BLINK_TIME 200
 
+
 #define LED_BYTES 5
+
+// for the rows of LEDs
+// the byte that will be shifted out 
+// @AS I believe that the least significant bit of each of these items is the left most LED of that row
 byte LEDrow[LED_BYTES];
 // bits are turned on here if they are blinking
 byte LEDblink[LED_BYTES];
@@ -27,25 +30,9 @@ const byte LEDdataPin = 4;
 static void ledsFullUpdate();
 
 
-// called to initialize LED's
-void 
-ledsSetup(void)
-{
-  //define pin modes 
-  pinMode(LEDlatchPin, OUTPUT);
-  pinMode(LEDclockPin, OUTPUT); 
-  pinMode(LEDdataPin, OUTPUT);
-  gNumberTimer=0;
-  gShowingNumber=0;
-}
-
-
-/**********************************************************************************************
- ***
- *** ShiftOut to address 42 LEDs via 4 74HC595s serial to parallel shifting registers 
- *** Based on http://arduino.cc/en/Tutorial/ShiftOut
- ***
- ***********************************************************************************************/
+/* ShiftOut to address 42 LEDs via 4 74HC595s serial to parallel shifting registers 
+ * Based on http://arduino.cc/en/Tutorial/ShiftOut
+ */
 static void shiftOut(int myLEDdataPin, int myLEDclockPin, byte myDataOut) {
   // This shifts 8 bits out MSB first, 
   // on the rising edge of the clock,
@@ -109,8 +96,6 @@ static void ledsOff(void)
 // to be blinking
 #define RESOLVE_BITS(led, blink)   (blink & gBlinkCycle) | led
 
-// @AS this makes no sense to me... needs to be called twice to
-// see the screen and then the led's are on 50% duty cycle. is it really necessary? 
 // this function shifts out the the 4 bytes corresponding to the led rows
 static void ledsLightUp(void)
 {
@@ -118,7 +103,11 @@ static void ledsLightUp(void)
    
    // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge 
    // case where 4 rows of LEDs lit at the same time sourcing too much current
-  
+   //
+   // @AS this makes no sense to me... needs to be called twice to
+   // see the screen and then the led's are on 50% duty cycle. is it really necessary? 
+
+   
    // blink on or off
    if((int16_t)((uint16_t)millis()-gBlinkTimer) > LED_BLINK_TIME) {
       if(gBlinkCycle)
@@ -253,12 +242,112 @@ void ledsUpdate(void)
   ledsLightUp();
 }
 
+// called from setup to initialize LED's
+void 
+ledsSetup(void)
+{
+  //define pin modes 
+  pinMode(LEDlatchPin, OUTPUT);
+  pinMode(LEDclockPin, OUTPUT); 
+  pinMode(LEDdataPin, OUTPUT);
+  gNumberTimer=0;
+  gShowingNumber=0;
+}
+
+/* In NONE mode, we are going to highlight the steps that are on, as well as the
+ * current step that's playing (if playing)
+ * We are also going to highlight the current track on the F buttons
+ */
+static void
+ledsHandleMainMode()
+{
+   uint8_t i;
+   SeqTrack *tr = &gSeqState.tracks[gRunningState.currentTrack];
+   SeqTrackStep *trs = &gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack];
+   
+   // highlight all turned on steps
+   for(i=0;i<tr->numSteps;i++) {
+      if (trs->steps[i].velocity) {
+         bitSet(LEDrow[i / 8], i % 8); 
+      }
+   }
+
+   // if rolling, toggle current step so it's noticeable
+   if(gRunningState.transportState==TRANSPORT_STARTED) {
+      TrackRunningState *t=&gRunningState.trackStates[gRunningState.currentTrack];
+      // flip it off if it's on, on if it's off
+      LEDrow[t->position / 8] ^=  (1 << (t->position % 8));      
+   }
+   
+   // highlight active track on the bottom row (remember first led on left is on the shift
+   // button, so we need to start with the second one over for track 1)
+   bitSet(LEDrow[4], 7 - gRunningState.currentTrack);
+   
+   
+}
+
+/* In pot mode, we need to display an indicator for the currently selected option
+ * which will either be a global option or a track option. The global options will
+ * be indicated by the first green row (5 options), the track options by the second row
+ * (6 options)
+ * Some of the options are toggle. For these, the value will be displayed with the top
+ * right LED (BUTTON_TOGGLE_SETTING button) which will blink if NO and solid if YES
+ * For options that are non yes/no, we are going to TODO
+ */
+static void
+ledsHandlePotMode()
+{
+   // TODO
+}
+
+static void 
+ledsHandleStepEdit()
+{
+   // TODO
+}
+
+static void
+ledsHandleLeftMode()
+{
+   // TODO
+}
+
+static void
+ledsHandleRightMode()
+{
+   // TODO
+}
+
+
 // this is used when we are not displaying a temporary value.
 // it does a full update based on the current state of things
 static void ledsFullUpdate()
 {
    // start with all off
    ledsOff();
+   
+   // determine current mode, and display led's accordingly
+   switch(gRunningState.currentMode) {
+   case SEQ_MODE_NONE:
+      ledsHandleMainMode();
+      break;
+   case SEQ_MODE_POTEDIT:
+      ledsHandlePotMode();
+      break;
+   case SEQ_MODE_STEPEDIT:
+      ledsHandleStepEdit();
+      break;
+   case SEQ_MODE_LEFT:
+      ledsHandleLeftMode();
+      break;
+   case SEQ_MODE_RIGHT:
+      ledsHandleRightMode();
+      break;   
+   }
+   
+   
+}
+   
    
 #if 0  
   // blink the led for each step in the sequence
@@ -407,4 +496,4 @@ static void ledsFullUpdate()
     LEDrow[4] = controlLEDrow; // light the LED for the mode we're in
   }
 #endif  
-}
+
