@@ -97,12 +97,15 @@ uiHandleMainMode()
 /* if in pot mode, we will respond to pot 1, 2, 5 and 6
  * if 1 or 5 are set to non-zero, we set a new submode
  * if 2 or 6 is moved, we check submode and alter setting based on it
+ * If either of these two are moved while left-shift is down, we just display the value
  * some of the modes are y/n which means that a button press toggles it
  */
 static void
 uiHandlePotMode(void)
 {
    uint8_t pv;
+   uint8_t showOnly=0; // 1=don't alter the value, 2=also display the value
+   uint8_t showVal=0;
    uint8_t global;
    SeqTrack *track = &gSeqState.tracks[gRunningState.currentTrack];
 
@@ -126,65 +129,93 @@ uiHandlePotMode(void)
    
    if(global) // signify that we are editing a global setting
       gRunningState.currentSubMode |= SEQ_GLBL_OR_TRED_SELECTOR;
+      
+   if(BUTTON_IS_PRESSED(BUTTON_L_SHIFT))
+      showOnly=1; // show value only, don't alter it
 
    if (!global && POT_JUST_CHANGED(POT_2)) { 
-      // if one of the track edit modes is set apply it's new setting to the track      
+      // if one of the track edit modes is set apply it's new setting to the track 
+      // also display the value
       switch(pv) {
       case SEQ_TRED_CHANNEL: // 0 based midi channel
-         track->midiChannel=POT_MAP(POT_2, 0, 15);
+         if(!showOnly)
+            track->midiChannel=POT_MAP(POT_2, 0, 15);
+         showVal=track->midiChannel+1;
          break;
       case SEQ_TRED_NOTENUM: // midi note
-         track->midiNote=POT_MAP(POT_2,0,127);
+         if(!showOnly)
+            track->midiNote=POT_MAP(POT_2,0,127);
+         showVal=track->midiNote;
          break;
       case SEQ_TRED_MUTED:   // muted (y/n)
-         track->muted=POT_MAP(POT_2,0,1);
+         if(!showOnly)
+            track->muted=POT_MAP(POT_2,0,1);
+         showVal=track->muted;
          break;
       case SEQ_TRED_NUMERATOR: // 1..4 (0 based)
-         track->clockDividerNum = POT_MAP(POT_2,0,3);
+         if(!showOnly)
+            track->clockDividerNum = POT_MAP(POT_2,0,3);
+         showVal=track->clockDividerNum+1;
          break;
       case SEQ_TRED_DENOM: // 1..4 (0 based)
-         track->clockDividerDenom = POT_MAP(POT_2,0,3);
+         if(!showOnly)
+            track->clockDividerDenom = POT_MAP(POT_2,0,3);
+         showVal=track->clockDividerDenom+1;
          break;
       case SEQ_TRED_STEPCOUNT: // 1..32 (0 based)
-         track->numSteps = POT_MAP(POT_2,0,31);
+         if(!showOnly)
+            track->numSteps = POT_MAP(POT_2,0,31);
+         showVal=track->numSteps+1;
          break;
       default:
          break;
       }
+      showOnly=2; // display the value (see below)
    }   
    else if (global && POT_JUST_CHANGED(POT_6)) { // editing global
       // if one of the global edit modes, apply it
       switch(pv) {
       case SEQ_GLBL_SWING:    // edit swing
-         gSeqState.swing = POT_MAP(POT_6,0,100);
+         if(!showOnly)
+            gSeqState.swing = POT_MAP(POT_6,0,100);
+         showVal=gSeqState.swing;
          break;
-      case SEQ_GLBL_RANDREGEN:// edit random regen (gen new random number every n steps) (1-32)
-         gSeqState.randomRegen = POT_MAP(POT_6,1,32);
+      case SEQ_GLBL_RANDREGEN:// edit random regen (gen new random number every n steps) 1 based (1-32)
+         if(!showOnly)
+            gSeqState.randomRegen = POT_MAP(POT_6,1,32);
+         showVal=gSeqState.randomRegen;
          break;
       case SEQ_GLBL_DELAYPAT: // delay pattern switch (y/n)
-         gSeqState.delayPatternSwitch = POT_MAP(POT_6,0,1);
+         if(!showOnly)
+            gSeqState.delayPatternSwitch = POT_MAP(POT_6,0,1);
+         showVal=gSeqState.delayPatternSwitch;
          break;
       case SEQ_GLBL_SENDCLK:  // send midi clock (y/n)
-         gSeqState.midiSendClock = POT_MAP(POT_6,0,1);
+         if(!showOnly)
+            gSeqState.midiSendClock = POT_MAP(POT_6,0,1);
+         showVal=gSeqState.midiSendClock;
          break;
       case SEQ_GLBL_SENDTHRU: // send midi thru (y/n)
       {
-         uint8_t t = POT_MAP(POT_6,0,1);
-         if(gSeqState.midiThru != t) {
+         uint8_t t = POT_MAP(POT_6,0,1);         
+         if(!showOnly && gSeqState.midiThru != t) {
             gSeqState.midiThru = t;
-            midiSetThru(); // TODO we also need to update this when loading from eeprom
+            midiSetThru();
          }
+         showVal=gSeqState.midiThru;
          break;
       }
       default:
          break;
-      }      
+      }
+      showOnly=2; // display the value (see below)
    }
    else if (BUTTON_JUST_PRESSED(BUTTON_TOGGLE_SETTING)) {
       // if in a mode that has a toggle setting, toggle it
       if(!global) {
-         if(pv==SEQ_TRED_MUTED)   // muted (y/n)
+         if(pv==SEQ_TRED_MUTED){   // muted (y/n)
             track->muted=!track->muted;         
+         }
       } else {
          switch(pv) {
          case SEQ_GLBL_DELAYPAT: // delay pattern switch (y/n)
@@ -195,13 +226,16 @@ uiHandlePotMode(void)
             break;
          case SEQ_GLBL_SENDTHRU: // send midi thru (y/n)
             gSeqState.midiThru = !gSeqState.midiThru;      
-            midiSetThru(); // TODO we also need to update this when loading from eeprom
+            midiSetThru(); 
             break;
          default:
             break;
          }      
       }
    }
+   
+   if(showOnly==2)
+      ledsShowNumber(showVal);
 }
 
 /* In step edit mode, we have selected a step for editing, so our submode indicates

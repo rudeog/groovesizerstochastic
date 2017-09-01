@@ -12,7 +12,7 @@
 // the byte that will be shifted out 
 // @AS I believe that the least significant bit of each of these items is the left most LED of that row
 byte LEDrow[LED_BYTES];
-// bits are turned on here if they are blinking
+// bits are turned on here if they are blinking (must not have corresponding LEDrow bit turned on, otherwise it will be solid lit)
 byte LEDblink[LED_BYTES];
 
 // will be set to true if we are currently showing a temporary value on the display
@@ -242,7 +242,8 @@ void ledsUpdate(void)
   ledsLightUp();
 }
 
-// called from setup to initialize LED's
+/* called from setup to initialize LED's
+ */
 void 
 ledsSetup(void)
 {
@@ -254,7 +255,7 @@ ledsSetup(void)
   gShowingNumber=0;
 }
 
-/* In NONE mode, we are going to highlight the steps that are on, as well as the
+/* In NONE mode (main mode), we are going to highlight the steps that are on, as well as the
  * current step that's playing (if playing)
  * We are also going to highlight the current track on the F buttons
  */
@@ -292,30 +293,169 @@ ledsHandleMainMode()
  * (6 options)
  * Some of the options are toggle. For these, the value will be displayed with the top
  * right LED (BUTTON_TOGGLE_SETTING button) which will blink if NO and solid if YES
- * For options that are non yes/no, we are going to TODO
+ * When pots that alter value of options are twiddled a number is shown with the value.
+ * That is not handled here, but in uiHandlePotMode.
  */
 static void
 ledsHandlePotMode()
 {
-   // TODO
+   uint8_t global=0;
+   uint8_t pv;
+   uint8_t boolval=0; // default not boolean, 1=boolean on, 2=boolean off
+   global = (gRunningState.currentSubMode & SEQ_GLBL_OR_TRED_SELECTOR) != 0;
+   pv=gRunningState.currentSubMode & (~SEQ_GLBL_OR_TRED_SELECTOR);
+   
+   if(!global) {
+      SeqTrack *track = &gSeqState.tracks[gRunningState.currentTrack];
+      switch(pv) {
+      case SEQ_TRED_CHANNEL: LEDrow[0] = B00000001; break;
+      case SEQ_TRED_NOTENUM: LEDrow[0] = B00000010; break;
+      case SEQ_TRED_MUTED:
+         LEDrow[0] = B00000100; 
+         boolval=(track->muted ? 1 : 2);
+         break;
+      case SEQ_TRED_NUMERATOR: LEDrow[0]=B00001000; break;
+      case SEQ_TRED_DENOM: LEDrow[0] =   B00010000; break;
+      case SEQ_TRED_STEPCOUNT: LEDrow[0]=B00100000; break;
+      default: 
+         LEDrow[0] = B01111111; 
+         break; // something wrong!
+      }      
+   } else { // global mode
+      switch(pv) {
+      case SEQ_GLBL_SWING:     LEDrow[1] = B00000001; break;
+      case SEQ_GLBL_RANDREGEN: LEDrow[1] = B00000010; break;
+      case SEQ_GLBL_DELAYPAT:  
+         LEDrow[1] = B00000100; 
+         boolval=(gSeqState.delayPatternSwitch ? 1 : 2);
+         break;
+      case SEQ_GLBL_SENDCLK:   
+         LEDrow[1] = B00001000; 
+         boolval=(gSeqState.midiSendClock ? 1 : 2);
+         break;
+      case SEQ_GLBL_SENDTHRU:  
+         LEDrow[1] = B00010000; 
+         boolval=(gSeqState.midiThru ? 1 : 2);
+         break;
+      default:
+         LEDrow[1] = B11111111; 
+         break; // something wrong!
+      }      
+   }   
+   
+   // show boolean types if applicable in top right LED
+   if(boolval) {
+      if(boolval==1) // on -- show solid
+         bitSet(LEDrow[0],7);
+      else // off -- show blinking
+         bitSet(LEDblink[0],7);
+   
+   }   
 }
 
+/* Create a bar graph on specified row that wraps around to following row.
+   Value is expected to be 0..15, but will be converted to 1..16 so that a
+   value of 0 will have 1 LED lit and a value of 15 will have 16 LED's lit.
+ */
+static void
+setBarGraph(uint8_t rowStart, uint8_t value)
+{
+   uint8_t val = value+1;
+   uint8_t bval=0;
+   
+   if(val > 8) {
+      val -=8;
+      // first row is all lit
+      LEDrow[rowStart] = B11111111;
+      // row we set is second row
+      rowStart++;
+   }
+   
+   // val will now be 1-8
+   for(uint8_t i=0;i<val;i++) {
+      // set bits starting at LSB
+      bval <<= 1;
+      bval |=0x01;
+   }
+   
+   LEDrow[rowStart]=bval;
+}
+
+/* Edited step is flashing (submode)
+ * Top two rows indicate velocity as a bar graph
+ * Bottom two rows indicate probability as a bar graph
+ * L shift is blinking (to indicate that if pressed, the mode will be exited)
+ */
 static void 
 ledsHandleStepEdit()
 {
-   // TODO
+   SeqStep *steps=gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack].steps;
+   
+   // display velocity as a bar graph on row 0 and 1
+   setBarGraph(0,steps[gRunningState.currentSubMode].velocity);   
+   setBarGraph(2,steps[gRunningState.currentSubMode].probability);
+   
+   // blink the edited step
+   bitSet(LEDblink[gRunningState.currentSubMode/8], gRunningState.currentSubMode % 8);
+   bitClear(LEDrow[gRunningState.currentSubMode/8], gRunningState.currentSubMode % 8);
+   
+   // blink the l-shift
+   LEDblink[4]=B00000001;
+   
 }
 
+/* total number of steps in track will light
+ * unmuted tracks (F lights) will be lit
+ */
 static void
 ledsHandleLeftMode()
 {
-   // TODO
+   // display which steps are available for selecting
+   setBarGraph(0,gSeqState.tracks[gRunningState.currentTrack].numSteps);
+   
+   // display which tracks are not muted
+   for(int i=0;i<NUM_TRACKS;i++) {
+      if(!gSeqState.tracks[i].muted) {
+         bitSet(LEDrow[4],7-i); 
+      }
+   }
 }
 
+/* F light 1..4 will light with current pattern
+ * F6 will be lit if pattern hold is in effect
+ * Bottom row left 5 lights are lit and one is blinking (depending on whether editing pat prob 1..4 or num cycles)
+ * top two rows indicate as a bar graph the value of current pat prob or num cycles
+ */
 static void
 ledsHandleRightMode()
 {
-   // TODO
+   uint8_t v;
+   // F row shows current pattern 0..3
+   bitSet(LEDrow[4],7 - gRunningState.pattern);
+   
+   // light F6 if pattern hold
+   if(gRunningState.patternHold)
+      bitSet(LEDrow[4], 7 - gRunningState.pattern);
+   
+   // light the currently selected submode on 4th row
+   bitSet(LEDrow[3],8-gRunningState.currentSubMode);
+   
+   // show the current value depending on submode
+   if(gRunningState.currentSubMode < 4) { 
+      // pattern 0..3 selected, show probability (0..15)
+      // 0 means no probability of switching to that pattern, which will be indicated with 1 light lit
+      v=gSeqState.patterns[gRunningState.pattern].nextPatternProb[gRunningState.currentSubMode/2];
+      if(gRunningState.currentSubMode % 2 == 0) // first or 3rd
+         v &= 0x0F;
+      else
+         v >>= 4;
+   } else {
+      // 4 is selected, which means numcycles to play current pattern (0 based)
+      v=gSeqState.patterns[gRunningState.pattern].numCycles;
+   }
+   
+   setBarGraph(0,v);
+   
 }
 
 
@@ -347,153 +487,4 @@ static void ledsFullUpdate()
    
    
 }
-   
-   
-#if 0  
-  // blink the led for each step in the sequence
-  static byte stepLEDrow[4];
-  // controlLEDrow is defined as global variable above so we can set it from helper functions
-  static unsigned long ledBlink; // for blinking an LED
-  static unsigned long ledBlink2; // for blinking another LED 
-  // ******************************************
-  //     LED setup: work out what is lit
-  //     end of button check if/else structure
-  // ******************************************
-  if (showingNumbers)
-  {
-    showNumber();
-  }
-  else if (showingWindow)
-  {
-    for (byte i = seqFirstStep; i < (seqFirstStep + seqLength); i++)
-      bitSet(LEDrow[i / 8], i % 8);
-  }
-  else
-  {
-    if (mode < 3) // editing tracks 0 - 11
-    {
-      // we always start with steps that are On and then work out what to blink or flash from there
-      for (byte i = 0; i < 32; i++)
-      {
-        if (checkStepOn(currentTrack, i))
-          bitSet(LEDrow[i / 8], i % 8); 
-      }
-    }
-
-    if (mode == 3)
-    {
-      for (byte i = 0; i < 12; i++) // show all the active steps (on all tracks) on one grid
-      {
-        for (byte j = 0; j < 4; j++)
-          LEDrow[j] |= track[i].stepOn[j]; 
-      }
-    }
-
-    if (mode < 4 && mode > 0) // blink selected steps if we're not in trigger mode
-    {
-      // blink step selected leds
-      if (millis() > ledBlink + 100)
-      {
-        for (byte i = 0; i < 4; i++)
-          LEDrow[i] ^= *edit[i];
-
-        if (millis() > ledBlink + 200)
-          ledBlink = millis(); 
-      } 
-    }
-
-    if (mode == 4) // we're in trigger mode
-    {
-      for (byte i = 0; i < 4; i++)
-        LEDrow[i] = toc[trigPage*4 + i];
-
-      // slow blink nowPlaying
-      if (nowPlaying < 255 && nowPlaying / 32 == trigPage) // we use 255 to turn nowPlaying "off", and only show if we're on the appropriate trigger page
-      {
-        if (millis() > ledBlink + 200)
-        {
-          LEDrow[(nowPlaying % 32) / 8] ^= 1<<(nowPlaying%8);
-
-          if (millis() > ledBlink + 400)
-            ledBlink = millis(); 
-        }
-      } 
-
-      // (fast) blink the pattern that's cued to play next
-      if (cued < 255 && cued / 32 == trigPage) // we use 255 turn cued "off", and only show if we're on the appropriate trigger page
-      {
-        if (millis() > ledBlink2 + 100)
-        {
-          LEDrow[(cued % 32) / 8] ^= 1<<(cued%8);
-
-          if (millis() > ledBlink2 + 200)
-            ledBlink2 = millis(); 
-        }
-      }
-
-      // (fast) blink the location that needs to be confirmed to overwrite
-      else if (confirm < 255 && confirm / 32 == trigPage)
-      {
-        if (millis() > ledBlink2 + 100)
-        {
-          LEDrow[(confirm % 32) / 8] ^= 1<<(confirm%8);
-
-          if (millis() > ledBlink2 + 200)
-            ledBlink2 = millis(); 
-        }
-      }
-
-      bitClear(controlLEDrow, 6);
-      bitClear(controlLEDrow, 5);
-    }
-
-    // this blinks the led for the current step
-    if (seqRunning || syncStarted)
-    {
-      for (byte i = 0; i < 4; i++)
-      {
-        stepLEDrow[i] = (lastStep / 8 == i) ? B00000001 << (lastStep % 8) : B00000000;
-        LEDrow[i] ^= stepLEDrow[i];
-      }
-    }
-
-    // update the controlLEDrow
-    switch (mode)
-    {
-    case 0:
-      controlLEDrow = B00000010;
-      controlLEDrow = controlLEDrow << currentTrack % 6;
-      if (currentTrack > 5)
-        bitSet(controlLEDrow, 7);
-      break;
-    case 3:
-      controlLEDrow = B10000001; // master page
-      if (seqRunning || syncStarted)
-        bitSet(controlLEDrow, 1);
-      if (mutePage)
-        bitSet(controlLEDrow, 3);
-      if (skipPage)
-        bitSet(controlLEDrow, 4);        
-      break;
-    case 4:
-      controlLEDrow = B00000001; // trigger page
-      controlLEDrow = bitSet(controlLEDrow, trigPage + 1); // light the LED for the page we're on
-      if (followAction == 1 || followAction == 2)  // light the LED for followAction 1 or 2
-          controlLEDrow = bitSet(controlLEDrow, 7 - followAction);
-      break;
-    case 5:
-      controlLEDrow = 0; // clear it
-      // set according to the preferences
-      if (midiSyncOut)
-        bitSet(controlLEDrow, 1);
-      if (thruOn)
-        bitSet(controlLEDrow, 2);
-      if (midiTrigger)
-        bitSet(controlLEDrow, 3);
-      break;
-    }
-
-    LEDrow[4] = controlLEDrow; // light the LED for the mode we're in
-  }
-#endif  
 

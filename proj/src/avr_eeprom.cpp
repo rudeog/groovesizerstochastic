@@ -11,6 +11,31 @@ eepromSetup(void)
   //begin EEPROM with I2C Address 
   mem_1.begin(0,0);//addr 0 (DEC) type 0 (defined as 24LC256)
 }
+
+/* What needs to happen when we load something from eeprom
+ *
+ */
+void
+eepromLoad()
+{
+   // gSeqState occupies about 804 bytes at the time of this writing
+   // that means a bit less than 13 eeprom pages to store all the data
+   // (we'll say 14 to be safe)
+   // that gives us 36 locations to store data. way more than we need
+   
+   //... read data into gSeqState here
+   
+   // reset running state to safe values
+   seqResetRunningState();
+   
+   // update running state and clock with tempo info
+   seqSetBPM(gSeqState.tempo);
+   
+   // update midi subsystem with current settings
+   midiSetThru();
+}
+
+
 #if 0 
 // for example
 

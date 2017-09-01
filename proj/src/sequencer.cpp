@@ -31,11 +31,12 @@ static inline void playNext(void);
 //
 
 // Initialize the sequencer
-// does not initialize tempo
+// does not initialize tempo (this is done via seqSetBPM)
 void seqSetup(void)
 {
    SeqTrack *track;
-   // initial 0 state should be fine for most things
+   // initial 0 state should be fine for most things, with the following exceptions:
+   
    gSeqState.randomRegen = 1;
    
    for (uint8_t j = 0; j<NUM_TRACKS; j++) {
@@ -44,6 +45,12 @@ void seqSetup(void)
       track->midiNote = DEFAULT_MIDI_NOTE;
    }
       
+   switchToPattern(0);
+}
+
+void seqResetRunningState()
+{
+   memset(&gRunningState, 0, sizeof(RunningState));
    switchToPattern(0);
 }
 

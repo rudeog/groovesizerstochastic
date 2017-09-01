@@ -89,7 +89,7 @@ struct SequencerState {
 
 extern SequencerState gSeqState;
 
-// use this to figure out size at compile time (currently 835)
+// use this to figure out size at compile time (currently 804)
 //char (*__kaboom)[sizeof( gSeqState )] = 1;
 
 #define SLAVE_MODE() (gSeqState.tempo==0)

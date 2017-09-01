@@ -85,6 +85,8 @@ void uiAcceptInput(void);
 
 // setup the sequencer to initial state
 void seqSetup(void);
+// reset the running state to known default
+void seqResetRunningState();
 // called from main loop to see if we need to alter sequencer state
 void seqCheckState(void);
 // set to playing or stopped see TRANSPORT_ defines
