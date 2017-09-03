@@ -112,11 +112,13 @@ STEP EDIT mode
 POT mode
 - depends on what is selected for editing. Each of these has a reserved light which blinks (use labels on the box):
    Top right green light is for indicating yes/no settings with blink=no, solid=yes
+   
    global Swing (0-99) numeric display
    global Random Regen (gen new random number every n steps) (1-32) numeric display
    global delay pattern switch (y/n)
    global send midi clock (y/n)
    global send midi thru (y/n)   
+   
    track channel - numeric display
    track note num - numeric display
    track clock numer 1..4 numeric display
@@ -124,3 +126,18 @@ POT mode
    track number of steps (1..32) numeric display
 
 
+
+   
+BUG LIST:
+- shift-R light is alway lit in none mode (only)
+- entering step-edit mode, since you are pushing a button to select it, it immediately sets velocity to that button's position
+- selecting track parameters or global parameters, if you pot all the way to the right, all lights light for the row (past end of valid selection)
+- sometimes when dialing in a number go all the way to top of the range, and it doesn't give the last value, eg range 1..32 goes up to 31 intermittently
+- right-shift mode - the led's that display for which pattern or numcycles is showing starting on the right side instead of the left
+- left shift mode - led's for mute track are showing from right side
+- right shift mode - leds that show which pattern is selected (red leds) are showing from right side
+- after messing for a while, now left shift led is lit and when i hold left shift, first 5 leds blink. this happens when you select a different track. track select is fucked bad!
+- tempo adjust not working (displays fine with shift)
+- cant toggle 16th step in none mode (actually it looks like value might be set but light is not lighting)
+- not getting note-off events (need code)
+- for 0/1 values on the pot, you have to go all the way clockwise to get a 1, it should switch half way (might be realted to other pot issue)

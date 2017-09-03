@@ -100,7 +100,7 @@ static void ledsOff(void)
 static void ledsLightUp(void)
 {
    static boolean lastSentTop = false;
-   
+
    // we want to alternate sending the top 2 and bottom 3 rows to prevent an edge 
    // case where 4 rows of LEDs lit at the same time sourcing too much current
    //
@@ -231,12 +231,12 @@ void ledsUpdate(void)
       if((int16_t)((uint16_t)millis()-gNumberTimer) > LED_TEMP_DISPLAY_TIME) {
          // stop showing it
          gShowingNumber=0;
-      } else
-         return; // keep showing number
+      }
    }
 
   // full update based on current state
-  ledsFullUpdate();
+  if(!gShowingNumber)
+   ledsFullUpdate();
   
   // light the actual lights
   ledsLightUp();

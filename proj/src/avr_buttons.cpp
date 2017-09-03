@@ -67,13 +67,24 @@ void buttonsUpdate(void)
   static uint8_t currentBtnState[BUTTON_BYTES]; // one bit for each
   static uint8_t debounceLastTime;
   uint8_t index, mask, btnByte, currentState;
-  
+
 
   // debounce. No need to take up more than a byte which gives us a range of 255 milliseconds 
   // we will definitely be in this function in much shorter periods than that.
   if((int8_t)((uint8_t)millis()-debounceLastTime) < DEBOUNCE_TIME)
     return; // not enough time has passed to debounce  
   debounceLastTime = (uint8_t)millis();
+
+
+    //BUTTONS
+  //Collect button data from the 4901s
+  //Pulse the latch pin:
+  //set it to 1 to collect parallel data
+  digitalWrite(BUTTONlatchPin,1);
+  //set it to 1 to collect parallel data, wait
+  delayMicroseconds(20);
+  //set it to 0 to transmit data serially  
+  digitalWrite(BUTTONlatchPin,0);  
   
 
   //BUTTONS

@@ -160,7 +160,7 @@ $(BINARY): $(ELF)
 
 $(CORE): $(COREOBJFILES)
 	$(ECHO) "Conjuring core..."
-	$(AT)rm $(CORE)
+	$(AT)rm $(CORE) || true
 	$(AT)$(AR) rcs $@ $^ 
 	
 .PHONY: showsize	

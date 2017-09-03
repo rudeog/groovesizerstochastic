@@ -25,7 +25,7 @@ getPotValue(uint8_t channel)
   digitalWrite(15, bitRead(channel, 2));  
   // we're only using readings between 25 and 1000, as the extreme ends are unstable
   return map((constrain(analogRead(ANALOGPIN), 25, 1000)), 25, 1000, 0, 1023); 
-  
+
 }
 
 // determine the current value of the pots
@@ -33,20 +33,23 @@ getPotValue(uint8_t channel)
 void
 potsUpdate(void)
 {
-  uint8_t ctr;
-  uint16_t val, sum;
-  gPotChangeFlag=0;
-  for(uint8_t i=0;i<POT_COUNT;i++) {// each pot
-    // get an average of 4 readings
-    for(uint8_t ctr=0, sum=0; ctr<POTS_AVG_COUNT; ctr++)
-      sum+=getPotValue(i);
-    val=sum/POTS_AVG_COUNT; 
-    // don't want underflows here when comparing
-    // HYSTERESIS value was taken from LXR code where it seems fine. Original code here had 35 as the threshold for
-    // indicating a changed value
-    if ((val > ( gPotValue[i] + HYSTERESIS)) ||
-      (gPotValue[i] > (val + HYSTERESIS)))
-      gPotChangeFlag |= (1 << i); // indicate that it's value has changed                     
-  }  
+   uint8_t ctr;
+   uint16_t val, sum;
+   gPotChangeFlag=0;
+   for(uint8_t i=0;i<POT_COUNT;i++) {// each pot
+      // get an average of 4 readings
+      sum=0;
+      for(uint8_t ctr=0; ctr<POTS_AVG_COUNT; ctr++)
+         sum+=getPotValue(i);
+      val=sum/POTS_AVG_COUNT;
+      // don't want underflows here when comparing
+      // HYSTERESIS value was taken from LXR code where it seems fine. Original code here had 35 as the threshold for
+      // indicating a changed value
+      if ((val > ( gPotValue[i] + HYSTERESIS)) ||
+      (gPotValue[i] > (val + HYSTERESIS))) {
+         gPotChangeFlag |= (1 << i); // indicate that it's value has changed
+         gPotValue[i]=val;
+      }
+   }
 }
 

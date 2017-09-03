@@ -30,7 +30,7 @@ void setup()
   potsUpdate();
   
   // initial clock setup (get the timer running)
-  seqSetBPM(DEFAULT_BPM); 
+  seqSetBPM(DEFAULT_BPM);
   
   // boot message - show version
   ledsShowNumber(VERSION_NUMBER);
@@ -95,7 +95,6 @@ end:
 //
 void loop() 
 {
-  
   // This will invoke callbacks - see HandleMidi   
   midiUpdate();
   
