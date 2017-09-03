@@ -59,7 +59,6 @@ void setup()
    } else {      
       // wait for user to press a button or move a pot.
       // this allows us to seed our random number gen with something truly random
-      
       for(;;) {
          for(i=0;i < BUTTON_COUNT;i++) {
             if(BUTTON_JUST_PRESSED(i)) {
@@ -95,6 +94,7 @@ end:
 //
 void loop() 
 {
+
   // This will invoke callbacks - see HandleMidi   
   midiUpdate();
   

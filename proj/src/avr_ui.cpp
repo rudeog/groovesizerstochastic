@@ -13,8 +13,8 @@ void modeCheck(void)
    uint8_t i;
    switch(gRunningState.currentMode) {
    case SEQ_MODE_NONE: // can switch to any mode except stepedit
-      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL) > SEQ_TRED_OFF || 
-         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL) > SEQ_GLBL_OFF) {
+      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL-1) > SEQ_TRED_OFF || 
+         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL-1) > SEQ_GLBL_OFF) {
          // switch to POTEDIT mode
          gRunningState.currentMode=SEQ_MODE_POTEDIT;
          gRunningState.currentSubMode=0; // will be set anyway in uiHandlePotMode
@@ -25,8 +25,8 @@ void modeCheck(void)
       }
       break;
    case SEQ_MODE_POTEDIT: // can shift to none when both pots are at 0
-      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL) == SEQ_TRED_OFF &&
-         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL) == SEQ_GLBL_OFF) {
+      if(POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL-1) == SEQ_TRED_OFF &&
+         POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL-1) == SEQ_GLBL_OFF) {
          gRunningState.currentMode=SEQ_MODE_NONE;
       }   
       break;
@@ -41,8 +41,9 @@ void modeCheck(void)
          gRunningState.currentMode=SEQ_MODE_NONE;
       } else {
          // can shift to stepedit when a green button is pressed
+         // we check for it's release rather because once in stepedit mode, we check for a press
          for(i=0;i<BUTTON_L_SHIFT;i++) { // for all green buttons
-            if(BUTTON_JUST_PRESSED(i)) {
+            if(BUTTON_JUST_RELEASED(i)) {
                // set submode to the step being edited
                gRunningState.currentSubMode=i;
                gRunningState.currentMode=SEQ_MODE_STEPEDIT;
@@ -63,13 +64,14 @@ void modeCheck(void)
 /* handles mode NONE. When we are not in a specific mode
  * need to respond to buttons which turn on and off notes
  * and also respond to F buttons which switch tracks
+ * also modify tempo
  */
 static void 
 uiHandleMainMode()
 {
    uint8_t i, len;
-   
-   len=gSeqState.tracks[gRunningState.currentTrack].numSteps;
+   // remember: numSteps is 0 based
+   len=gSeqState.tracks[gRunningState.currentTrack].numSteps+1;
    SeqStep *steps=gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack].steps;
    
    // check to see if any of the step buttons were just pressed and  toggle them
@@ -88,8 +90,16 @@ uiHandleMainMode()
    for (i = BUTTON_FUNCTION; i < BUTTON_FUNCTION + BUTTON_NUM_FUNCTION; i++) {
       if (BUTTON_JUST_PRESSED(i)) {
          // if the track is not current, switch to it
-         gRunningState.currentTrack = i;
+         gRunningState.currentTrack = i-BUTTON_FUNCTION;
       }
+   }
+   
+   if(POT_JUST_CHANGED(POT_3)) {      
+      // tempo can be 0, or 50-255
+      gSeqState.tempo = POT_MAP(POT_3,49,255);
+      if(gSeqState.tempo==49)
+         gSeqState.tempo=0;      
+      ledsShowNumber(gSeqState.tempo);
    }
    
 }
@@ -112,12 +122,12 @@ uiHandlePotMode(void)
    // set the correct sub-mode based on pots 1 and 5
 
    // see if we are in global edit
-   pv = POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL);
+   pv = POT_MAP(POT_5, SEQ_GLBL_OFF, SEQ_GLBL_TOTAL-1);
    if (pv != SEQ_GLBL_OFF) {
       global = 1;
    } else {
       // see if we are in track edit
-      pv = POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL);      
+      pv = POT_MAP(POT_1, SEQ_TRED_OFF, SEQ_TRED_TOTAL-1);      
       global=0;
    }
       

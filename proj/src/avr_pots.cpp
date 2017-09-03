@@ -1,6 +1,6 @@
 #include "avr_main.h"
 #define POTS_AVG_COUNT 4
-#define HYSTERESIS     3
+#define HYSTERESIS     0
 #define ANALOGPIN      0      // the analog pin connected to multiplexer output
 /* @AS read the pot values and save a bit as to whether they've changed
  */ 
@@ -25,7 +25,7 @@ getPotValue(uint8_t channel)
   digitalWrite(15, bitRead(channel, 2));  
   // we're only using readings between 25 and 1000, as the extreme ends are unstable
   return map((constrain(analogRead(ANALOGPIN), 25, 1000)), 25, 1000, 0, 1023); 
-
+  
 }
 
 // determine the current value of the pots
@@ -42,14 +42,15 @@ potsUpdate(void)
       for(uint8_t ctr=0; ctr<POTS_AVG_COUNT; ctr++)
          sum+=getPotValue(i);
       val=sum/POTS_AVG_COUNT;
+      
       // don't want underflows here when comparing
       // HYSTERESIS value was taken from LXR code where it seems fine. Original code here had 35 as the threshold for
       // indicating a changed value
       if ((val > ( gPotValue[i] + HYSTERESIS)) ||
-      (gPotValue[i] > (val + HYSTERESIS))) {
+      (gPotValue[i] > (val + HYSTERESIS)))
          gPotChangeFlag |= (1 << i); // indicate that it's value has changed
-         gPotValue[i]=val;
-      }
+      gPotValue[i]=val;
+      
    }
 }
 

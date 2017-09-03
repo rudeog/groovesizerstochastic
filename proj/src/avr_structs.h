@@ -29,7 +29,7 @@ extern uint8_t gButtonIsPressed[BUTTON_BYTES];
 #define BUTTON_L_SHIFT 32
 #define BUTTON_R_SHIFT 39
 // offset for function buttons
-#define BUTTON_FUNCTION 33  
+#define BUTTON_FUNCTION 33  // first button after shift-l
 #define BUTTON_NUM_FUNCTION 6 // number of function buttons
 
 // the button that toggles y/n setting for pot mode y/n options

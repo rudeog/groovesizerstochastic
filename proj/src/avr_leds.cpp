@@ -1,7 +1,7 @@
 #include "avr_main.h"
 
 // time in ms to display temporary values (like if a pot is twiddled)
-#define LED_TEMP_DISPLAY_TIME 1000
+#define LED_TEMP_DISPLAY_TIME 1500
 // time in milliseconds between state flip
 #define LED_BLINK_TIME 200
 
@@ -10,7 +10,8 @@
 
 // for the rows of LEDs
 // the byte that will be shifted out 
-// @AS I believe that the least significant bit of each of these items is the left most LED of that row
+// @AS the least significant bit of each of these items is the left most LED of that row
+//     MOST SIGNIFICANT BIT IS THE LED ON THE RIGHT!
 byte LEDrow[LED_BYTES];
 // bits are turned on here if they are blinking (must not have corresponding LEDrow bit turned on, otherwise it will be solid lit)
 byte LEDblink[LED_BYTES];
@@ -266,8 +267,8 @@ ledsHandleMainMode()
    SeqTrack *tr = &gSeqState.tracks[gRunningState.currentTrack];
    SeqTrackStep *trs = &gSeqState.patterns[gRunningState.pattern].trackSteps[gRunningState.currentTrack];
    
-   // highlight all turned on steps
-   for(i=0;i<tr->numSteps;i++) {
+   // highlight all turned on steps (numsteps is 0 based)
+   for(i=0;i<tr->numSteps+1;i++) {
       if (trs->steps[i].velocity) {
          bitSet(LEDrow[i / 8], i % 8); 
       }
@@ -282,7 +283,7 @@ ledsHandleMainMode()
    
    // highlight active track on the bottom row (remember first led on left is on the shift
    // button, so we need to start with the second one over for track 1)
-   bitSet(LEDrow[4], 7 - gRunningState.currentTrack);
+   bitSet(LEDrow[4], gRunningState.currentTrack + 1);
    
    
 }
@@ -354,7 +355,7 @@ ledsHandlePotMode()
 }
 
 /* Create a bar graph on specified row that wraps around to following row.
-   Value is expected to be 0..15, but will be converted to 1..16 so that a
+   Value is expected to be 0..31, but will be converted to 1..32 so that a
    value of 0 will have 1 LED lit and a value of 15 will have 16 LED's lit.
  */
 static void
@@ -362,6 +363,22 @@ setBarGraph(uint8_t rowStart, uint8_t value)
 {
    uint8_t val = value+1;
    uint8_t bval=0;
+   
+   if(val > 24) {
+      val -=8;
+      // first row is all lit
+      LEDrow[rowStart] = B11111111;
+      // row we set is second row
+      rowStart++;
+   }
+   
+   if(val > 16) {
+      val -=8;
+      // first row is all lit
+      LEDrow[rowStart] = B11111111;
+      // row we set is second row
+      rowStart++;
+   }
    
    if(val > 8) {
       val -=8;
@@ -416,7 +433,7 @@ ledsHandleLeftMode()
    // display which tracks are not muted
    for(int i=0;i<NUM_TRACKS;i++) {
       if(!gSeqState.tracks[i].muted) {
-         bitSet(LEDrow[4],7-i); 
+         bitSet(LEDrow[4],i+1); 
       }
    }
 }
@@ -431,14 +448,14 @@ ledsHandleRightMode()
 {
    uint8_t v;
    // F row shows current pattern 0..3
-   bitSet(LEDrow[4],7 - gRunningState.pattern);
+   bitSet(LEDrow[4],gRunningState.pattern+1);
    
    // light F6 if pattern hold
    if(gRunningState.patternHold)
-      bitSet(LEDrow[4], 7 - gRunningState.pattern);
+      bitSet(LEDrow[4], 6);
    
    // light the currently selected submode on 4th row
-   bitSet(LEDrow[3],8-gRunningState.currentSubMode);
+   bitSet(LEDrow[3],gRunningState.currentSubMode);
    
    // show the current value depending on submode
    if(gRunningState.currentSubMode < 4) { 
