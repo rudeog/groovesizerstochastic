@@ -96,10 +96,11 @@ uiHandleMainMode()
    
    if(POT_JUST_CHANGED(POT_3)) {      
       // tempo can be 0, or 50-255
-      gSeqState.tempo = POT_MAP(POT_3,49,255);
-      if(gSeqState.tempo==49)
-         gSeqState.tempo=0;      
-      ledsShowNumber(gSeqState.tempo);
+      uint8_t tempo = POT_MAP(POT_3,49,255);
+      if(tempo==49)
+         tempo=0;
+      ledsShowNumber(tempo);
+      seqSetBPM(tempo);
    }
    
 }
@@ -177,6 +178,10 @@ uiHandlePotMode(void)
             track->numSteps = POT_MAP(POT_2,0,31);
          showVal=track->numSteps+1;
          break;
+      case SEQ_TRED_STEPLENGTH: // 1..32 16th notes (0 based)
+         if(!showOnly)
+            track->stepLength = POT_MAP(POT_2,0,31);
+         showVal=track->stepLength+1;
       default:
          break;
       }

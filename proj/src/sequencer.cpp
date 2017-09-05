@@ -435,15 +435,20 @@ processStep(uint8_t trNum, uint8_t pos)
       // prob of 0 doesn't mean never (it's effectively 1 based) 
       if (step->probability + 1 > gRunningState.trackStates[trNum].lastRandom) {
          uint8_t vel; 
+         uint16_t length; // max will be 9600 at 50bpm with len of 32
          // 1..15 translate to 1..127. 
          vel = 7 + (step->velocity * 8);
+         
+         // determine length in m/s of each step
+         // steplength is 0 based length in 16th notes, do the math!
+         length = (uint16_t)(250 * 60 * (uint32_t)(track->stepLength+1) / (uint32_t)gRunningState.tempo);
          
          LOGMESSAGE(0, "[play] pat %1d tr %1d st %2d: ch %d note %d vel %d",
             gRunningState.pattern + 1, trNum + 1, pos + 1,
             track->midiChannel + 1, track->midiNote, vel);
          
          // This expects 1 based midi channel
-         midiPlayNote(track->midiChannel + 1, track->midiNote, vel);         
+         midiPlayNote(track->midiChannel + 1, track->midiNote, vel, length, trNum);
       }
    }
 }

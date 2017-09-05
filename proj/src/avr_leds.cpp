@@ -315,9 +315,10 @@ ledsHandlePotMode()
          LEDrow[0] = B00000100; 
          boolval=(track->muted ? 1 : 2);
          break;
-      case SEQ_TRED_NUMERATOR: LEDrow[0]=B00001000; break;
-      case SEQ_TRED_DENOM: LEDrow[0] =   B00010000; break;
-      case SEQ_TRED_STEPCOUNT: LEDrow[0]=B00100000; break;
+      case SEQ_TRED_NUMERATOR: LEDrow[0]= B00001000; break;
+      case SEQ_TRED_DENOM: LEDrow[0] =    B00010000; break;
+      case SEQ_TRED_STEPCOUNT: LEDrow[0]= B00100000; break;
+      case SEQ_TRED_STEPLENGTH: LEDrow[0]=B01000000; break;
       default: 
          LEDrow[0] = B01111111; 
          break; // something wrong!

@@ -54,7 +54,8 @@ struct SeqTrack {
    //supported clock divider values: anything where numerator and denominator are 1..4
    uint8_t clockDividerNum : 2;     // numerator for clock divider (0 based so 0=1)
    uint8_t clockDividerDenom : 2;   // denominator for clock divider (0 based)
-   uint8_t numSteps;                // length of track 1-32 (0 based, add 1)
+   uint8_t numSteps : 5;            // length of track 1-32 (0 based, add 1)
+   uint8_t stepLength : 5;          // length of a midi played step in 16th notes (0 based, add 1) 1-32
    
    uint8_t muted : 1;        // muted or not
    uint8_t midiNote : 7; // which midi note it sends   
@@ -141,7 +142,8 @@ struct TrackRunningState {
 #define SEQ_TRED_NUMERATOR 4 // 1..4 (0 based)
 #define SEQ_TRED_DENOM     5 // 1..4 (0 based)
 #define SEQ_TRED_STEPCOUNT 6 // 1..32 (0 based)
-#define SEQ_TRED_TOTAL     7 // total number of track settings
+#define SEQ_TRED_STEPLENGTH 7 // 1..32 (0 based)
+#define SEQ_TRED_TOTAL     8 // total number of track settings
 
 // this bit combined with the above is stored in currentSubMode
 // If it's set we are editing global setting, otherwise a track setting

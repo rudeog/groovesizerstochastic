@@ -10,12 +10,31 @@ MIDI_CREATE_INSTANCE(HardwareSerial, Serial, midiA);
 //
 // PUBLIC
 //
+struct Playing {
+   uint16_t time;   
+   uint8_t noteNum;
+   uint8_t isOn : 1;
+   uint8_t chan : 4;
+};
 
+static Playing gPlayingNotes[NUM_TRACKS];
+
+// length is in ms
 void
-midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel)
+midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel, uint16_t length, uint8_t track)
 {
-   // TODO add to Q so we can do note-off's
-   // chan here is 1 based
+   if(gPlayingNotes[track].isOn) {
+      // turn it off
+      midiA.sendNoteOff(gPlayingNotes[track].noteNum,0,gPlayingNotes[track].chan);      
+   }
+   
+   // signify on
+   gPlayingNotes[track].time=millis()+length;
+   gPlayingNotes[track].isOn=1;
+   gPlayingNotes[track].chan=chan;
+   gPlayingNotes[track].noteNum=note;
+   
+   // chan here is 1 based   
    midiA.sendNoteOn(note, vel, chan);
 }
 
@@ -24,6 +43,16 @@ midiPlayNote(uint8_t chan, uint8_t note, uint8_t vel)
 void midiUpdate(void)
 {
   midiA.read();
+  
+  // see if any notes need to go off
+  for(uint8_t track=0;track<NUM_TRACKS;track++) {
+     if(gPlayingNotes[track].isOn) {
+        if((int16_t)((uint16_t)millis()-gPlayingNotes[track].time) >= 0) {
+           midiA.sendNoteOff(gPlayingNotes[track].noteNum,0,gPlayingNotes[track].chan);      
+           gPlayingNotes[track].isOn=0;
+        }
+     }
+  }  
 }
 
 void midiSendClock(void)

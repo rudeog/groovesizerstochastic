@@ -32,9 +32,6 @@ void setup()
   // initial clock setup (get the timer running)
   seqSetBPM(DEFAULT_BPM);
   
-  // boot message - show version
-  ledsShowNumber(VERSION_NUMBER);
-  
   // check pots 1 and 5 to make sure they are at 0, if not
   // display a warning and wait. this also gets a random seed
    if(POT_VALUE(POT_1) > 5 || POT_VALUE(POT_5) > 5) {
@@ -59,7 +56,15 @@ void setup()
    } else {      
       // wait for user to press a button or move a pot.
       // this allows us to seed our random number gen with something truly random
+      
+      // clear just ind
+      buttonsUpdate();
+      potsUpdate();
+      
       for(;;) {
+         // boot message - show version
+         ledsShowNumber(VERSION_NUMBER);
+         
          for(i=0;i < BUTTON_COUNT;i++) {
             if(BUTTON_JUST_PRESSED(i)) {
                seq=i;
