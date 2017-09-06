@@ -271,7 +271,7 @@ advancePosition(uint8_t tr)
    SeqTrack *track = &gSeqState.tracks[tr];
 
    // if this was the last position, we need to check for pattern change
-   // track 0 determines the length of a cycle
+   // track 0 determines the length of a cycle (numSteps is 0 based)
    if (tr == 0 && trState->position == track->numSteps)
       gRunningState.patternHasPlayed = 1;
 

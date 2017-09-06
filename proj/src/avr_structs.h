@@ -51,7 +51,19 @@ extern uint8_t gButtonIsPressed[BUTTON_BYTES];
 // use to get the value of the pot  
 #define POT_VALUE(index) gPotValue[(index)]  
 
-#define POT_MAP(index, min, max) map(POT_VALUE(index), 0, 1023, min, max)
+//#define POT_MAP(index, min, max) map(POT_VALUE(index), 0, 1023, min, max)
+// supposedly the ends of the range are unstable
+#define CONSTRAIN_VAL 5
+#define POT_MAP(index, min, max) \
+   map( \
+      constrain( \
+         POT_VALUE(index),CONSTRAIN_VAL, (1023-CONSTRAIN_VAL) \
+      ), \
+      CONSTRAIN_VAL, (1023-CONSTRAIN_VAL), min, max \
+   )
+
+//return map((constrain(analogRead(ANALOGPIN), 25, 1000)), 25, 1000, 0, 1023); 
+
 
 extern uint16_t gPotValue[POT_COUNT];  // to store the values of out 6 pots (range 0-1023)
 extern uint8_t gPotChangeFlag;         // determine whether pot has changed
