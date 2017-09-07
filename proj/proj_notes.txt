@@ -131,6 +131,7 @@ POT mode
 BUG LIST:
 - for 0/1 values on the pot, you have to go all the way clockwise to get a 1, it should switch half way (might be realted to other pot issue)
 - need midi learn
-- !!!!getting spurious pot movement that causes pot value changed to trigger (eg when in track edit mode)
 - after receiving midi stop, you have to manually start sequencer before it starts playing in order to receive a midi start and play
-- had some intermittent issue with playing at 4/1 speed. set track 1 to 4/1 cycle between pat 1 and 2, after a while track 1 stops playing, after a bit it starts again. when it stops, the flashing led that indicates play position shows nothing for track 1 and track 4 but shows a transport position for the other tracks.
+- had some intermittent issue with playing at 4/1 speed. set track 1 to 4/1 cycle between pat 1 and 2, after a while track 1 stops playing, after a bit it starts again. when it stops, the flashing led that indicates play position shows nothing 
+for track 1 and track 4 but shows a transport position for the other tracks. In this case, the offending track has it's position set on 0 ALWAYS.
+When it restarts the moving light continues but it always stops on 0. happens in 2/1 as well but not eg 1/2 
