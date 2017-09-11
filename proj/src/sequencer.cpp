@@ -355,7 +355,7 @@ scheduleNext(void)
             }
 
 
-            if (!trState->denomCycle) {
+            if (!trState->denomCycle) { // increments when we have a real step
                uint16_t swing = 0;
                // squirrel this away so that we can calculate an offset from
                // this time for our 1/4, 1/2 and 3/4 divs
@@ -465,8 +465,7 @@ playNext(void)
       // only concerned with ones that are not already sched.
       // on unmuted tracks
       if (trState->isScheduled &&
-         (int16_t)(millis()-trState->nextScheduledStart) >= 0 ) {
-
+         (int16_t)((uint16_t)(millis())-trState->nextScheduledStart) >= 0 ) {
          // play the step if need be
          if(!track->muted)
             processStep(i, trState->position);

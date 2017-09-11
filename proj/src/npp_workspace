@@ -10,11 +10,11 @@
         <File name="avr_pots.cpp" />
         <File name="avr_structs.h" />
         <File name="avr_ui.cpp" />
-        <File name="npp_workspace" />
         <File name="protos.h" />
         <File name="random.cpp" />
         <File name="sequencer.cpp" />
         <File name="sequencer.h" />
         <File name="E:\codez\src\groovesizerstochastic\proj\Makefile" />
+        <File name="E:\codez\src\groovesizerstochastic\proj\proj_notes.txt" />
     </Project>
 </NotepadPlus>
