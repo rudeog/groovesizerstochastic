@@ -151,10 +151,6 @@
     <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\proj\src\avr_buttons.cpp" />
-    <ClCompile Include="..\..\proj\src\avr_leds.cpp" />
-    <ClCompile Include="..\..\proj\src\avr_main.cpp" />
-    <ClCompile Include="..\..\proj\src\avr_ui.cpp" />
     <ClCompile Include="..\..\proj\src\random.cpp" />
     <ClCompile Include="..\..\proj\src\sequencer.cpp" />
     <ClCompile Include="buttons.cpp" />

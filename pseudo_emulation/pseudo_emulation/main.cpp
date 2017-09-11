@@ -552,4 +552,4 @@ int main(int argc, char *argv[])
 void clockSetBPM(uint8_t) {}
 void midiSendStart(void) {}
 void midiSendStop(void) {}
-void midiPlayNote(uint8_t, uint8_t, uint8_t) {}
+void midiPlayNote(uint8_t , uint8_t , uint8_t , uint16_t , uint8_t ) {}
