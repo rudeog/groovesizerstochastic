@@ -77,13 +77,15 @@ R-shift plus F button 1..4 selects the pattern.
 R-shift plus F6 toggles pattern hold
 
 
-In RIGHT mode, bottom row of step buttons indicate 4 probability selections and cycle selection
+In RIGHT mode, bottom row of step buttons indicate 4 probability selections and cycle selection (as well as load/save)
   pushing one of these buttons (R shift still held) selects that setting (prob 1..4, cycles)
   for editing 
   Top two rows indicate level for selection, and can be pressed to select
   all of this while R shift is held
   When R shift is released, back to NONE mode
-  
+
+  Load/save - bottom row of green buttons first 5 are used for above, last two (on right) are load/save respectively.
+  - pushing one of them sets that mode in standby, and one of the first 16 green buttons is pressed to load/save
 
 Clicking either L or R shift while holding the other toggles playback
 

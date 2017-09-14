@@ -459,23 +459,22 @@ ledsHandleRightMode()
    bitSet(LEDrow[3],gRunningState.currentSubMode);
    
    // show the current value depending on submode
-   if(gRunningState.currentSubMode < 4) { 
-      // pattern 0..3 selected, show probability (0..15)
-      // 0 means no probability of switching to that pattern, which will be indicated with 1 light lit
-      v=gSeqState.patterns[gRunningState.pattern].nextPatternProb[gRunningState.currentSubMode/2];
-      if(gRunningState.currentSubMode % 2 == 0) // first or 3rd
-         v &= 0x0F;
-      else
-         v >>= 4;
-   } else {
-      // 4 is selected, which means numcycles to play current pattern (0 based)
-      v=gSeqState.patterns[gRunningState.pattern].numCycles;
-   }
-   
-   setBarGraph(0,v);
-   
+   if(gRunningState.currentSubMode <= 4) {
+      if(gRunningState.currentSubMode < 4) { 
+         // pattern 0..3 selected, show probability (0..15)
+         // 0 means no probability of switching to that pattern, which will be indicated with 1 light lit
+         v=gSeqState.patterns[gRunningState.pattern].nextPatternProb[gRunningState.currentSubMode/2];
+         if(gRunningState.currentSubMode % 2 == 0) // first or 3rd
+            v &= 0x0F;
+         else
+            v >>= 4;
+      } else{
+         // 4 is selected, which means numcycles to play current pattern (0 based)
+         v=gSeqState.patterns[gRunningState.pattern].numCycles;
+      }
+      setBarGraph(0,v);
+   }   
 }
-
 
 // this is used when we are not displaying a temporary value.
 // it does a full update based on the current state of things

@@ -74,7 +74,9 @@ void potsUpdate(void);
 /////////////////////////
 // EEPROM
 void eepromSetup(void);
-
+// Each slot occupies 16 pages, there are 512 pages, so 32 slots
+void eepromSave(uint8_t slot);
+void eepromLoad(uint8_t slot);
 /////////////////////////
 // UI
 void uiAcceptInput(void);

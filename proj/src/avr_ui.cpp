@@ -336,6 +336,15 @@ uiHandleRightMode()
       }         
    }
    
+   if(i==24+5) { // didn't get a press above
+      if(BUTTON_JUST_PRESSED(31)) { // load
+         gRunningState.currentSubMode=6;
+      } else if(BUTTON_JUST_PRESSED(32)) { // save
+         gRunningState.currentSubMode=7;
+      }
+   }
+   
+   
    // top two row of buttons are for setting either the probability or the num cycles
    // depending on current sub mode
    for(i=0;i<16;i++) {
@@ -354,10 +363,18 @@ uiHandleRightMode()
                statePattern->nextPatternProb[idx] &= 0x0F; // clear high nibble
                statePattern->nextPatternProb[idx] |= (i << 4); // set it
             }                        
-         } else { // it is equal to 4 (which represents numcycles)
+         } else if(gRunningState.currentSubMode ==4) { //  numcycles
             // set num cycles
             statePattern->numCycles = i;
+         } else if(gRunningState.currentSubMode ==6) { //  load
+            // load from slot 0-15
+            eepromLoad(i);
+            ledsShowNumber(i+1); // just give some visual indication
+         } else if(gRunningState.currentSubMode ==7) { //  save
+            eepromSave(i);
+            ledsShowNumber(i+1); // just give some visual indication
          }
+         
          break;
       }
    }

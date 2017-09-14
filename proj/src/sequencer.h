@@ -121,7 +121,7 @@ struct TrackRunningState {
 #define SEQ_MODE_POTEDIT  1 // pot 1 or 5 is at a non-zero location.   SUBMODE: which option is selected
 #define SEQ_MODE_STEPEDIT 2 // when l-shift and a step is selected.    SUBMODE: which step is selected
 #define SEQ_MODE_LEFT     3 // when L shift is held
-#define SEQ_MODE_RIGHT    4 // when R shift is held                    SUBMODE: which pattern/cycle button is selected
+#define SEQ_MODE_RIGHT    4 // when R shift is held                    SUBMODE: which pattern/cycle button is selected or 6=load, 7=save
 
 // sub-modes for pot edit mode:
 
