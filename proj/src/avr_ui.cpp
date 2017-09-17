@@ -337,9 +337,9 @@ uiHandleRightMode()
    }
    
    if(i==24+5) { // didn't get a press above
-      if(BUTTON_JUST_PRESSED(31)) { // load
+      if(BUTTON_JUST_PRESSED(30)) { // load
          gRunningState.currentSubMode=6;
-      } else if(BUTTON_JUST_PRESSED(32)) { // save
+      } else if(BUTTON_JUST_PRESSED(31)) { // save
          gRunningState.currentSubMode=7;
       }
    }

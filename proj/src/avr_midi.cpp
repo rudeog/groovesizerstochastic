@@ -111,11 +111,17 @@ static void HandleNoteOff(byte channel, byte pitch, byte velocity)
 {
 } 
 
+static uint8_t gJustStarted=0;
 // Called 24 times per QN when we are receiving midi clock
 static void HandleClock(void)
 {  
   if(SLAVE_MODE()) { // slave mode
-   seqClockTick();
+   if(gJustStarted)
+      gJustStarted=0; // throw away first clock tick, see seqSetTransportState for more about this nonsense
+   else {
+      seqClockTick();   
+      //gRunningState.tempo
+   }
   }   
 }
 
@@ -126,6 +132,7 @@ static void HandleStart (void)
 {  
   if(SLAVE_MODE()) { // slave mode
     seqSetTransportState(TRANSPORT_STARTED);
+    gJustStarted=1;
   }
 }
 

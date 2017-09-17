@@ -4,6 +4,8 @@
 # * AVR compiler (avr-gcc et al) in path, or
 # * AVR_TOOLKIT_ROOT set to installation directory for example:
 #     export AVR_TOOLKIT_ROOT="/e/codez/arduino-1.8.2/hardware/tools/avr"
+#     export AVR_TOOLKIT_ROOT="/c/data/dev/arduino-1.8.2/hardware/tools/avr"
+# path needed at home /c/data/dev/GnuWin32/bin
 #   NOTE that on windows, you MAY need the quotes and the windows style path (not sure when)
 #   This path is the root of which the ./bin directory contains avr-gcc
 #
