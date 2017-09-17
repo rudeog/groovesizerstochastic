@@ -107,6 +107,7 @@ seqSetTransportState(uint8_t state)
       // it is needed otherwise we are one step (16th note) ahead of clock
       // (I had thought that in slave mode since we SHOULD get a midi clock right away it
       // should have done it
+      // is suspect it has to do with the order in which things are happening in our loop
       seqClockTick(); 
    }
 }

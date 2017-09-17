@@ -112,16 +112,29 @@ static void HandleNoteOff(byte channel, byte pitch, byte velocity)
 } 
 
 static uint8_t gJustStarted=0;
+static uint16_t gStartTime=0;
+static uint8_t gCounter=0;
 // Called 24 times per QN when we are receiving midi clock
 static void HandleClock(void)
 {  
-  if(SLAVE_MODE()) { // slave mode
-   if(gJustStarted)
-      gJustStarted=0; // throw away first clock tick, see seqSetTransportState for more about this nonsense
-   else {
-      seqClockTick();   
-      //gRunningState.tempo
-   }
+   if(SLAVE_MODE()) { // slave mode
+   
+      if(!gJustStarted) { // throw away first clock tick, see seqSetTransportState for more about this nonsense            
+         seqClockTick();
+      }
+      
+      // to calculate bpm (has nothing to do with that skipping of the clock tick above except that it reuses gJustStarted)
+      if(gCounter == 0) {
+         if(!gJustStarted)
+            gRunningState.tempo = (uint8_t) (int32_t)(60000 / ((int16_t)((uint16_t)millis() - gStartTime)));
+         gStartTime=(uint16_t)millis();      
+      }
+      gCounter++;
+      if(gCounter > 23)
+          gCounter=0;
+      
+      
+      gJustStarted=0; 
   }   
 }
 

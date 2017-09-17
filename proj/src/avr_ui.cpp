@@ -298,6 +298,11 @@ uiHandleLeftMode()
       ledsShowNumber(gSeqState.tempo);
    }
    
+   // actual tempo (for when slaved)
+   if(POT_JUST_CHANGED(POT_4)) {      
+      ledsShowNumber(gRunningState.tempo);
+   }
+   
    // check r-shift and toggle playback
    if(BUTTON_JUST_PRESSED(BUTTON_R_SHIFT)) {      
       seqSetTransportState(gRunningState.transportState==TRANSPORT_STARTED ? TRANSPORT_STOPPED : TRANSPORT_STARTED);
