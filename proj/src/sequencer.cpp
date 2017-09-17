@@ -83,7 +83,7 @@ seqCheckState(void)
 void
 seqSetTransportState(uint8_t state)
 {
-   if (state == TRANSPORT_STARTED) {      
+   if (state == TRANSPORT_STARTING) {
       gStepCounter = 0;
       // initialize current pattern
       switchToPattern(NUM_PATTERNS);
@@ -91,7 +91,7 @@ seqSetTransportState(uint8_t state)
    
    if(gSeqState.midiSendClock) {
       switch(state) {
-      case TRANSPORT_STARTED:
+      case TRANSPORT_STARTING:
          midiSendStart();
          break;
       case TRANSPORT_STOPPED:
@@ -101,13 +101,8 @@ seqSetTransportState(uint8_t state)
    }
    gRunningState.transportState = state;
    
-   if (state == TRANSPORT_STARTED) {
-      // since our timer will be delayed by 1 tick, trigger it right away
-      // why this is needed as well if we are slaved, I haven't quite figured out, but
-      // it is needed otherwise we are one step (16th note) ahead of clock
-      // (I had thought that in slave mode since we SHOULD get a midi clock right away it
-      // should have done it
-      // is suspect it has to do with the order in which things are happening in our loop
+   // non slave mode - create an initial tick
+   if (state == TRANSPORT_STARTING && !SLAVE_MODE()) {
       seqClockTick(); 
    }
 }
@@ -116,6 +111,9 @@ seqSetTransportState(uint8_t state)
 void 
 seqClockTick(void)
 {
+   if(gRunningState.transportState == TRANSPORT_STARTING)
+      gRunningState.transportState=TRANSPORT_STARTED;
+   
    /* Midi clock is sent 24 times per quarter note.
    */
    if (gSeqState.midiSendClock &&

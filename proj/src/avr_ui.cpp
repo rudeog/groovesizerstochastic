@@ -275,6 +275,15 @@ uiHandleStepEdit()
    }
 }
 
+static void
+toggleTransport()
+{
+   if(gRunningState.transportState==TRANSPORT_STARTED)
+      seqSetTransportState(TRANSPORT_STOPPED);
+   else if(gRunningState.transportState==TRANSPORT_STOPPED)
+      seqSetTransportState(TRANSPORT_STARTING);
+}     
+
 /* In this mode we can toggle mute on a track, 
  * also exercising pot 3 shows current tempo without changing it
  * Also, if R shift is pressed we toggle playback
@@ -304,10 +313,8 @@ uiHandleLeftMode()
    }
    
    // check r-shift and toggle playback
-   if(BUTTON_JUST_PRESSED(BUTTON_R_SHIFT)) {      
-      seqSetTransportState(gRunningState.transportState==TRANSPORT_STARTED ? TRANSPORT_STOPPED : TRANSPORT_STARTED);
-   }
-   
+   if(BUTTON_JUST_PRESSED(BUTTON_R_SHIFT))
+      toggleTransport();
 }
 
 /* While R-Shift is held:
@@ -390,9 +397,9 @@ uiHandleRightMode()
    }
       
    // check L-shift and toggle playback
-   if(BUTTON_JUST_PRESSED(BUTTON_L_SHIFT)) {      
-      seqSetTransportState(gRunningState.transportState==TRANSPORT_STARTED ? TRANSPORT_STOPPED : TRANSPORT_STARTED);
-   }
+   if(BUTTON_JUST_PRESSED(BUTTON_L_SHIFT))
+      toggleTransport();      
+   
 }
 
 /* Main dispatcher for user interaction. Try to keep things modularized and single purpose here

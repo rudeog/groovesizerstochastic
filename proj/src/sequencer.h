@@ -22,6 +22,7 @@
 
 #define TRANSPORT_STOPPED   0
 #define TRANSPORT_STARTED   1
+#define TRANSPORT_STARTING  2 // use this state to invoke playback
 
 #define MODE_NORMAL         0 // turn on and off steps, switch tracks, mute tracks
 #define MODE_EDIT_STEP      1 // edit individual steps

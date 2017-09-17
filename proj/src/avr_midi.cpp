@@ -117,13 +117,10 @@ static uint8_t gCounter=0;
 // Called 24 times per QN when we are receiving midi clock
 static void HandleClock(void)
 {  
-   if(SLAVE_MODE()) { // slave mode
-   
-      if(!gJustStarted) { // throw away first clock tick, see seqSetTransportState for more about this nonsense            
-         seqClockTick();
-      }
+   if(SLAVE_MODE()) { // slave mode   
+      seqClockTick();
       
-      // to calculate bpm (has nothing to do with that skipping of the clock tick above except that it reuses gJustStarted)
+      // to calculate bpm
       if(gCounter == 0) {
          if(!gJustStarted)
             gRunningState.tempo = (uint8_t) (int32_t)(60000 / ((int16_t)((uint16_t)millis() - gStartTime)));
@@ -132,8 +129,6 @@ static void HandleClock(void)
       gCounter++;
       if(gCounter > 23)
           gCounter=0;
-      
-      
       gJustStarted=0; 
   }   
 }
@@ -144,7 +139,7 @@ static void HandleClock(void)
 static void HandleStart (void)
 {  
   if(SLAVE_MODE()) { // slave mode
-    seqSetTransportState(TRANSPORT_STARTED);
+    seqSetTransportState(TRANSPORT_STARTING);
     gJustStarted=1;
   }
 }
