@@ -210,7 +210,15 @@ patternChangeCheck()
 static inline void 
 resetTracks()
 {
-   memset(gRunningState.trackStates, 0, NUM_TRACKS * sizeof(TrackRunningState));
+   TrackRunningState *trState;
+   uint16_t save;
+   for(uint8_t i=0;i<NUM_TRACKS;i++) {
+      trState = &gRunningState.trackStates[i];      
+      save = trState->lastDivStartTime;
+      memset(trState, 0, sizeof(TrackRunningState));   
+      // needed for eg 4/1 time when switching patterns avoid scheduling offset from 0
+      trState->lastDivStartTime = save;
+   }
 }
 
 // switch to a new pattern. this also 
