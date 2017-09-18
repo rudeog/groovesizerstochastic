@@ -75,7 +75,8 @@ seqCheckState(void)
 
       // do we need to change patterns?
       // needs to be called after the above
-      patternChangeCheck();
+      // * moved to scheduleNext so we can only do it when an actual step is gotten
+      //patternChangeCheck();
    }
 }
 
@@ -172,6 +173,7 @@ static inline void
 patternChangeCheck()
 {
    uint8_t hasPlayed = gRunningState.patternHasPlayed;
+   // check for manual (user) switch of patterns
    uint8_t switchTo = gRunningState.nextPattern; // will be NUM_PATTERNS if not active
    
    // reset this bit always
@@ -192,7 +194,7 @@ patternChangeCheck()
             gSeqState.patterns[gRunningState.pattern].numCycles) {
             // we need to switch. figure out which pattern to switch to.
             // will come back with NUM_PATTERNS if no switch needed
-            switchTo = determineNextPattern();            
+            switchTo = determineNextPattern();
          }
       }         
    }
@@ -211,13 +213,14 @@ static inline void
 resetTracks()
 {
    TrackRunningState *trState;
-   uint16_t save;
+   //uint16_t save;
    for(uint8_t i=0;i<NUM_TRACKS;i++) {
       trState = &gRunningState.trackStates[i];      
-      save = trState->lastDivStartTime;
+      //save = trState->lastDivStartTime;
       memset(trState, 0, sizeof(TrackRunningState));   
       // needed for eg 4/1 time when switching patterns avoid scheduling offset from 0
-      trState->lastDivStartTime = save;
+      // *not needed anymore since moving patterncheck to scheduleNext
+      //trState->lastDivStartTime = save;
    }
 }
 
@@ -350,6 +353,11 @@ scheduleNext(void)
    // a counter but don't schedule a step
    uint8_t haveRealStep = gRunningState.lastStepTimeTriggered;      
    gRunningState.lastStepTimeTriggered = 0;
+
+   // first see if we need to switch patterns.
+   // If we have a new step, we see if pattern needs to be switched first
+   if (haveRealStep)
+      patternChangeCheck();
    
    // for each track check it
    for (uint8_t i = 0; i<NUM_TRACKS; i++) {

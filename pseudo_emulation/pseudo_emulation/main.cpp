@@ -88,14 +88,22 @@ void midiSendClock()
 }
 
 
-void advanceClock(int increment)
+void advanceClock(int increment, bool until=false)
 {
    // internalClock is called every n milliseconds
    // where n is the period of time between a 24 ppqn beat
    // (same as midi clock)
    // we need to use microseconds to fix rounding issues
+
    int period = (1000 * 1000 / (gSeqState.tempo * 24 / 60));
    increment *= 1000; // convert to uS
+
+   if (until) {
+      increment -= xxCurrentTime;
+      if (increment < xxCurrentTime)
+         return;
+   }
+   
    while (increment--) {
       // emulate the timer
       if (xxCurrentTime % period == 0) {
@@ -120,7 +128,7 @@ struct Command {
 Command cmds[] = {
    ////////////////////////////////////////////////////////////////////////////////]
    { "q","quit" }, //0
-   { "cl","<n> advance clock n milliseconds default one" }, //1
+   { "cl","<n> advance clock n milliseconds default one (see also 'until')" }, //1
    { "div","<num> <denom> set divider num/denom" }, //2
    { "len","<len> set track len (pass 1 based)" }, //3
    { "tempo","<n> set tempo to n (range 50-255)" }, //4
@@ -141,6 +149,7 @@ Command cmds[] = {
    { "patrep","<n> Times to repeat pattern (1..16)" }, // 19
    { "pathold","<n> If 1 will hold the pattern indefinitely" }, // 20   
    { "loglevel", "<n> set log level (0=sparse 1=more, ...)"},  // 21
+   { "until", "<n> advance clock until the specified time in ms"}, // 22
    { 0,0 }
 };
 
@@ -403,8 +412,10 @@ void doSequencer()
          }
          break;
       case 7: // transport 0=stop, 1=play
-         if (params[0] == TRANSPORT_STOPPED || params[0] == TRANSPORT_STARTED)
-            seqSetTransportState(params[0]);
+         if (params[0] == 0)
+            seqSetTransportState(TRANSPORT_STOPPED);
+         else if(params[0] == 1)
+            seqSetTransportState(TRANSPORT_STARTING);
          else
             outputString("Invalid state [0 stop, 1 start]\n");
          break;
@@ -528,6 +539,11 @@ void doSequencer()
          break;
       case 21: // loglevel
          xxLogLevel = params[0];
+         break;
+      case 22: // clock advance until n milliseconds
+         if (!pc)
+            outputString("Specify a time in ms, you dope\n");
+         advanceClock(params[0],true);
          break;
 
       } // end case

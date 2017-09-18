@@ -69,45 +69,11 @@ void midiSendStop(void)
 {
   midiA.sendRealTime(midi::Stop); // send a midi clock stop signal)  
 }
-static void HandleNoteOn(byte channel, byte pitch, byte velocity) 
-{ 
-  #if 0
-  // Do whatever you want when you receive a Note On.
-  // Try to keep your callbacks short (no delays ect) as the contrary would slow down the loop()
-  // and have a bad impact on real-time performance.
-  if (channel == 10 && pitch < 112) // receive patch changes on triggerChannel (default channel 10); there are 112 memory locations
-  {      
-    if (checkToc(pitch))
-    {
-      recall = true; // we're ready to recall a preset
-      pageNum = pitch * 4; // one memory location is 4 pages long
-      cued = pitch; // the pattern that will play next is the value of "pitch" - need this to blink lights
-      head = pitch; // need this for pattern chaining to work properly
-      mode = 4; // make sure we're in trigger mode, if we weren't already
-      trigPage = pitch/32; // switch to the correct trigger page
-      controlLEDrow = B00000001; // light the LED for trigger mode
-      controlLEDrow = bitSet(controlLEDrow, trigPage + 1); // light the LED for the page we're on     
-    }
-  }
-  else if (mode != 7  && pitch > 0 && channel == 10)
-  {
-    if (!seqRunning && !midiClock)
-    { 
-      if (velocity != 0) // some instruments send note off as note on with 0 velocity
-      {
-        lastNote = pitch;
-        int newVelocity = (pot[2] + velocity < 1023) ? pot[2] + velocity : 1023; 
-      }
-      else // velocity = 0;
-      {
-      }
-    }
-  }
-  #endif
+static void handleNoteOn(byte channel, byte pitch, byte velocity) 
+{   
 }
 
-
-static void HandleNoteOff(byte channel, byte pitch, byte velocity) 
+static void handleNoteOff(byte channel, byte pitch, byte velocity) 
 {
 } 
 
@@ -115,7 +81,7 @@ static uint8_t gJustStarted=0;
 static uint16_t gStartTime=0;
 static uint8_t gCounter=0;
 // Called 24 times per QN when we are receiving midi clock
-static void HandleClock(void)
+static void handleClock(void)
 {  
    if(SLAVE_MODE()) { // slave mode   
       seqClockTick();
@@ -129,25 +95,25 @@ static void HandleClock(void)
       gCounter++;
       if(gCounter > 23)
           gCounter=0;
-      gJustStarted=0; 
+      gJustStarted=0;
   }   
 }
 
 /* Called when we receive a MIDI start
  *  
  */
-static void HandleStart (void)
+static void handleStart (void)
 {  
   if(SLAVE_MODE()) { // slave mode
     seqSetTransportState(TRANSPORT_STARTING);
-    gJustStarted=1;
+    gJustStarted=1; // see handleClock
   }
 }
 
 /* Called when we receive a midi stop
  *  
  */
-void HandleStop (void)
+void handleStop (void)
 {
   if(SLAVE_MODE()) { // slave mode
     seqSetTransportState(TRANSPORT_STOPPED);
@@ -169,11 +135,11 @@ void midiSetup(void)
   midiA.begin(MIDI_CHANNEL_OMNI);    
 
   // Connect the HandleNoteOn function to the library, so it is called upon reception of a NoteOn.
-  midiA.setHandleNoteOn(HandleNoteOn);  // only put the name of the function here - functions defined in HandleMidi
-  midiA.setHandleNoteOff(HandleNoteOff);
-  midiA.setHandleClock(HandleClock);
-  midiA.setHandleStart(HandleStart);
-  midiA.setHandleStop(HandleStop); 
+  midiA.setHandleNoteOn(handleNoteOn);  // only put the name of the function here - functions defined in HandleMidi
+  midiA.setHandleNoteOff(handleNoteOff);
+  midiA.setHandleClock(handleClock);
+  midiA.setHandleStart(handleStart);
+  midiA.setHandleStop(handleStop); 
 
   // setup based on current sequencer state
   midiSetThru();
