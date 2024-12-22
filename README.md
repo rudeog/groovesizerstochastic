@@ -18,6 +18,12 @@ If you are on windows, you'll want something like cygwin and gnu make
 to run the makefile. Also you'll need avrdude which talks to the AVR
 programmer to send the firmware to the box.
 
+If you don't feel like building it, I've included the binary in the
+repo here (stocha.hex). You'll still need avrdude. Here is a command
+line from the makefile:
+
+    avrdude -C/path/to/avrdude.conf -v -patmega328p -cstk500v2 -Pusb -Uflash:w:stocha.hex:i
+
 Hey I never said it would be easy, but if you are one of the rare
 people that actually have a groovesizer box, then you are a fine
 specimen indeed! You can do it! If you have questions feel free to create
