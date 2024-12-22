@@ -10,6 +10,19 @@ sequencer which allows semi-random generative sequences that yield
 similar functionality to the open source sequencer
 [Stochas](https://stochas.org)
 
+You'll need to install the AVR toolchain. Although there is some
+Arduino code in here, this is not built using Arduino, and you will
+need to have the AVR toolchain. You'll also need a programmer to send
+the firmware to your box.
+If you are on windows, you'll want something like cygwin and gnu make
+to run the makefile. Also you'll need avrdude which talks to the AVR
+programmer to send the firmware to the box.
+
+Hey I never said it would be easy, but if you are one of the rare
+people that actually have a groovesizer box, then you are a fine
+specimen indeed! You can do it! If you have questions feel free to create
+an issue in the repo and I'll see it right away.
+
 
 # Tips
 
