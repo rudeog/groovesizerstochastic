@@ -1,9 +1,15 @@
----
-author: Andrew Shakinovsky
-operator: Andrew Shakinovsky
----
+### Groovesize Stochastic
 
-# Groovesize Stochastic
+# Intro
+
+This is custom firmware for the Groovesizer hardware which as of this
+writing is no longer in production. However if you are lucky enough
+to have this hardware, and you are able to compile and build this and
+upload it to your hardware, you will have a pretty cool midi
+sequencer which allows semi-random generative sequences that yield
+similar functionality to the open source sequencer
+[Stochas](https://stochas.org)
+
 
 # Tips
 
